@@ -221,6 +221,24 @@ button.primary {
 button.primary:disabled { opacity: 0.5; }
 
 #connect { min-width: 110px; }
+
+/* Radio-name: lives IN the header's control row (Brett 2026-09-22,
+   ONE step at a time) - small, neat, beside Connect, sharing the row
+   with the state pill. Phone sizing in the media block below. */
+#radio-name {
+  width: 150px;
+  flex: 0 1 auto;
+  background: var(--screen-bg);
+  border: 1px solid var(--panel-edge);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 6px 8px;
+  font: inherit;
+  font-size: 12px;
+  box-shadow: var(--screen-inset);
+}
+#radio-name:disabled { opacity: .5; }
+#radio-name::placeholder { color: var(--muted); }
 /* Connected: pressed-in plate (inset shadow, no glow) so the state
    reads at a glance - the label says "- Disconnect" beside it. */
 #connect[data-mode="connected"] {
@@ -380,6 +398,11 @@ svg.trail .hoplabel {
   .inputrow { flex-wrap: wrap; }
   .inputrow input { min-width: 0; flex: 1 1 160px; min-height: 44px; font-size: 16px; }
   #source-mode { font-size: 16px; }
+
+  /* Radio-name on the pill+Connect row: sized to FIT that line -
+     flex-shrink lets it give way when the pill label grows
+     ("connecting..."), min-width:0 lets the placeholder truncate. */
+  #radio-name { flex: 0 1 124px; min-width: 0; }
 
   main { padding: 10px 10px 72px; }
   .card { padding: 12px; border-radius: 14px; margin-bottom: 12px; }
