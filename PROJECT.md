@@ -12,17 +12,20 @@ The CLIENT apps for the MeshTech Scope system. The server (meshtech-node,
 on the hilltop Pi) listens to the mesh radio and serves the processed
 map. This repo holds what runs on the OTHER side of the link:
 
-    meshtech-phone/
-      web/      THE SHARED BASE - the map app (same code as scope-app).
-                Today it runs in a browser on Brett's PC and talks to
-                hilltop over WiFi/TCP (the "direct" connection).
-      android/  the future official Android app (TWA wrapper). EMPTY
-                for now - filled on TWA day (stage 5).
-      apple/    the future iOS variant (browser-based; iPhone gets WiFi
-                only - Apple blocks browser BLE). EMPTY for now.
-      tools/    sync_to_node.py - builds web/ and copies the result
-                into meshtech-node's served app/ folder. No more
-                manual copying.
+    meshtech-phone/  (BRANCHES - Brett's shape, 2026-09-22)
+      main     THE SHARED BASE - app/ = the map app source (same code
+               as scope-app). Today it runs in a browser on Brett's PC
+               and talks to hilltop over WiFi/TCP (the "direct"
+               connection). Shared docs live on this branch.
+      web      main + web/ = the browser shell (index.html, icon,
+               manifest, service worker) + web docs. Full builds here.
+      android  main + the future official Android app (TWA wrapper).
+               Empty for now - filled on TWA day (stage 5).
+      apple    main + the future iOS variant (browser-based; iPhone
+               gets WiFi only - Apple blocks browser BLE). Empty.
+      tools    main + helper scripts (sync_to_node.py copies the built
+               app into meshtech-node's served app/ folder. No more
+               manual copying; bench serve.py).
 
 ## The design (from PHONE-APP-DESIGN.md in meshtech-node - keep in sync)
 
