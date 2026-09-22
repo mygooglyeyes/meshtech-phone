@@ -399,10 +399,19 @@ svg.trail .hoplabel {
   .inputrow input { min-width: 0; flex: 1 1 160px; min-height: 44px; font-size: 16px; }
   #source-mode { font-size: 16px; max-width: 150px; min-width: 0; }
 
-  /* Radio-name on the pill+Connect row: sized to FIT that line -
-     flex-shrink lets it give way when the pill label grows
-     ("connecting..."), min-width:0 lets the placeholder truncate. */
-  #radio-name { flex: 0 1 124px; min-width: 0; }
+  /* PINNED BOTTOM ROW (Brett 2026-09-22): disconnected + Connect +
+     radio-name ALWAYS on one horizontal line - no reflow, no
+     shuffling when labels change. The three ride a dedicated flex
+     line via CSS order + fixed widths; the select and title fill
+     row 1. Measured: 88 + 130 + 124 + 2 gaps = 358 <= 366 avail. */
+  #conn-state { order: 4; }
+  #connect { order: 5; margin-right: 0; } /* gap alone; the desktop margin double-counted and broke the exact-fit line */
+  #radio-name { order: 6; flex: 0 1 124px; min-width: 0; }
+  /* Title refuses to shrink (nowrap) and the select stays 150px:
+     together they exceed the row once the pill tries to join, so the
+     pill ALWAYS lands on the Connect+radio-name line. */
+  header h1 { white-space: nowrap; flex-shrink: 0; }
+  #source-mode { flex: 0 0 150px; }
 
   main { padding: 10px 10px 72px; }
   .card { padding: 12px; border-radius: 14px; margin-bottom: 12px; }
