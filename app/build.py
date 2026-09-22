@@ -79,10 +79,13 @@ def main() -> int:
 
     # index.html ships pointing at /src/main.ts; rewrite to the bundle.
     # The browser shell (index/icon/manifest/sw) lives on the TARGET
-    # branches (web/, android/, apple/), not on main (shared-only).
-    # On main: bundle + tests still verify the shared code, cleanly.
-    if (APP / "index.html").exists():
-        shutil.copy(APP / "index.html", dist / "index.html")
+    # branches under web/ (android/ and apple/ add their own later),
+    # not on main (shared-only). Shell found -> full dist; not found ->
+    # bundle + tests still verify the shared code, cleanly.
+    shell_dir = next((d for d in (APP.parent / "web", APP)
+                      if (d / "index.html").exists()), None)
+    if shell_dir is not None:
+        shutil.copy(shell_dir / "index.html", dist / "index.html")
         index = dist / "index.html"
         html = index.read_text(encoding="utf-8").replace(
             '<script type="module" src="/src/main.ts"></script>',
@@ -91,7 +94,8 @@ def main() -> int:
         index.write_text(html, encoding="utf-8")
 
         for name in ("manifest.webmanifest", "icon.svg", "sw.js"):
-            shutil.copy(APP / name, dist / name)
+            if (shell_dir / name).exists():
+                shutil.copy(shell_dir / name, dist / name)
     else:
         print("(no browser shell on this branch - bundling + tests only; "
               "run this build on the web branch for a full dist)")
