@@ -15,7 +15,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-APP = Path(__file__).resolve().parent
+APP = Path(__file__).absolute().resolve().parent  # app/ - the folder holding this build script
 DENO_CANDIDATES = [
     # SCOPE_RUNTIME overrides everything (Docker images set it to deno).
     Path(os.environ["SCOPE_RUNTIME"]) if os.environ.get("SCOPE_RUNTIME") else None,
@@ -78,23 +78,34 @@ def main() -> int:
              "--format=esm", "--minify"])
 
     # index.html ships pointing at /src/main.ts; rewrite to the bundle.
-    shutil.copy(APP / "index.html", dist / "index.html")
-    index = dist / "index.html"
-    html = index.read_text(encoding="utf-8").replace(
-        '<script type="module" src="/src/main.ts"></script>',
-        '<link rel="stylesheet" href="./app.css" />\n'
-        '  <script type="module" src="./app.js"></script>')
-    index.write_text(html, encoding="utf-8")
+    # The browser shell (index/icon/manifest/sw) lives on the TARGET
+    # branches under web/ (android/ and apple/ add their own later),
+    # not on main (shared-only). Shell found -> full dist; not found ->
+    # bundle + tests still verify the shared code, cleanly.
+    shell_dir = next((d for d in (APP.parent / "web", APP)
+                      if (d / "index.html").exists()), None)
+    if shell_dir is not None:
+        shutil.copy(shell_dir / "index.html", dist / "index.html")
+        index = dist / "index.html"
+        html = index.read_text(encoding="utf-8").replace(
+            '<script type="module" src="/src/main.ts"></script>',
+            '<link rel="stylesheet" href="./app.css" />\n'
+            '  <script type="module" src="./app.js"></script>')
+        index.write_text(html, encoding="utf-8")
 
-    for name in ("manifest.webmanifest", "icon.svg", "sw.js"):
-        shutil.copy(APP / name, dist / name)
+        for name in ("manifest.webmanifest", "icon.svg", "sw.js"):
+            if (shell_dir / name).exists():
+                shutil.copy(shell_dir / name, dist / name)
+    else:
+        print("(no browser shell on this branch - bundling + tests only; "
+              "run this build on the web branch for a full dist)")
 
     # dist/demo.html is GENERATED (demo_shell.py) - never copied from
     # the repo root, whose demo.html is only a redirect to dist/.
     from demo_shell import DEMO_HTML
     (dist / "demo.html").write_text(DEMO_HTML, encoding="utf-8")
     print(f"\nBuilt {dist} - serve it over TLS (or localhost) and open "
-          "index.html. Demo: demo.html")
+          "index.html. Demo: demo.html")  # index.html only on shell branches
     return 0
 
 
