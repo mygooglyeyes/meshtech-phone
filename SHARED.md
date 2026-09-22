@@ -1,25 +1,27 @@
-# SHARED.md - how code flows (one base, three targets)
+# SHARED.md - how code flows (one base, target BRANCHES)
 
-The rule: **web/ is the only place app code is written.** The other
-targets consume it; they never fork it.
+The rule: **app code is written on main, the shared branch.** The
+target branches consume it; they never fork it differently.
 
-    web/  (the shared base, TypeScript)
+    main    THE SHARED BRANCH - app/ source + shared docs
+      |        (everything every target needs)
       |
-      |  build.py -> dist/
-      |
-      +--> meshtech-node/app/   (what hilltop serves to a PC browser)
-      |    via: python tools/sync_to_node.py
-      |    (gates on tests - a failing build never syncs)
-      |
-      +--> android/ (stage 5)   TWA wraps the same dist, no code change
-      |
-      +--> apple/   (later)     same source + iOS icon/stylesheet tweak
+      +--> web branch     = main + web/ (browser shell: index, icon,
+      |                     manifest, SW) + web docs
+      |                     build.py finds web/ and emits a full dist
+      +--> android branch = main + the TWA wrapper files (stage 5)
+      +--> apple branch   = main + iOS shell tweaks (later)
+      +--> tools branch   = main + helper scripts only
+                              (sync_to_node, bench serve)
 
-Consequences:
+Consequences (Brett's branch shape, 2026-09-22):
 
-- A fix made in android/ or apple/ that touches app behavior is in the
-  WRONG place - move it to web/ and re-sync.
-- "Which copy is live?" is answered by sync_to_node.py, never by hand.
-- After a sync, meshtech-node's app/ copy is committed in the SERVER
-  repo (that repo carries the served bundle) - with Brett's OK, as
-  always.
+- A fix to shared code happens ONCE on main, then main is merged into
+  web/android/apple/tools - quick mechanical merges, nothing rewritten.
+- A branch may add ONLY its own specialization (shell files, wrapper,
+  docs). App behavior changes belong on main, never on a branch.
+- "Which copy is live?" is answered by sync_to_node.py (tools branch),
+  never by hand. After a sync, meshtech-node's app/ copy is committed
+  in the SERVER repo - with Brett's OK, as always.
+- Tests (`python app/build.py --test`) run on ANY branch: main verifies
+  shared code, target branches verify their full dist.

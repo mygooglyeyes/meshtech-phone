@@ -5,7 +5,7 @@ note at the bottom when finished.
 
 ## In progress
 
-- (none - repo just seeded)
+- (none - branch layout just built, awaiting Brett's push word)
 
 ## Next up (awaiting Brett's pick)
 
@@ -33,6 +33,9 @@ note at the bottom when finished.
 
 ## Archive (done, kept briefly for context)
 
-- 2026-09-22: repo created (web/ seeded from scope-app, android/ and
-  apple/ placeholders, RULES.md, README.md, ATTRIBUTION.md, LICENSE,
-  PROJECT.md, TODOS.md, sync script).
+- 2026-09-22: repo created (seeded from scope-app, docs, sync script).
+- 2026-09-22: BRANCH LAYOUT built per Brett: main = shared app/ source
+  + docs; web/android/apple/tools branches add only their
+  specialization; build.py shell-optional (verifies on main, full dist
+  on web); SHARED.md/README/PROJECT rewritten for branches. Tests
+  green on main and web.
