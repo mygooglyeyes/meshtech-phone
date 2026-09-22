@@ -1,30 +1,35 @@
 # meshtech-phone - the client apps for the MeshTech Scope system
 
-One repo, three targets, one shared base. The phone chapter of the
-MeshTech project (see `RULES.md` at the root for how we work).
+One repo, target BRANCHES, one shared base. The phone chapter of the
+MeshTech project (see `RULES.md` on main for how we work).
 
-    meshtech-phone/
-      web/      THE SHARED BASE - the map app (TypeScript, no framework).
-                Builds with `python build.py`; meshtech-node serves the
-                built dist. This is what runs on Brett's PC today and
-                what every other target wraps.
-      android/  THE OFFICIAL ANDROID APP - a Trusted Web Activity (TWA)
-                wrapper around web/ (Bubblewrap; built on "app day",
-                stage 5 of PHONE-APP-DESIGN.md).
-      apple/    iOS web-app specialization (apple-touch-icon, iOS
-                styling). Browser-only: no browser BLE on iOS.
+    meshtech-phone/  (BRANCHES, not folders - Brett, 2026-09-22)
+
+      main branch     THE SHARED BASE - app/ holds the map app source
+                      (TypeScript, no framework). Shared docs live here.
+                      Builds/verifies with `python app/build.py --test`.
+      web branch      main + web/ (browser shell: index.html, icon,
+                      manifest, service worker) + web docs. The FULL
+                      dist is built on this branch.
+      android branch  main + the future TWA wrapper (fills on TWA day,
+                      stage 5 of PHONE-APP-DESIGN.md).
+      apple branch    main + the iOS variant (fills after stage 1).
+                      Browser-only: no browser BLE on iOS.
+      tools branch    main + helper scripts only (sync_to_node.py,
+                      bench serve.py).
 
 ## The flow (one direction, no drift)
 
-    web/  --build.py-->  dist/  --sync script-->  meshtech-node/app/
+    main (app/ source)
+      -> each target branch adds only its shell/wrapper
+      -> web branch: build.py -> dist/ -> sync_to_node.py -> meshtech-node/app/
 
-The server never edits the client; the client never edits the server.
-`tools/sync_to_node.py` (run after every build) copies the built
-output into meshtech-node's served `app/` folder so the manual-copy
-mistake can never happen again.
+A fix to shared code is made ONCE on main, then merged into the four
+target branches (quick mechanical merges). A branch never changes app
+behavior - it only adds its specialization. See SHARED.md.
 
 ## Status
 
 Stage 1 (WiFi/TCP on the phone, responsive layout, install-ready) is
-the first build. See `RULES.md` for stage order and the decided
-channel (TWA).
+the first build. See `RULES.md` (on main) for stage order and the
+decided channel (TWA - never call it PWA).
