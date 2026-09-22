@@ -385,10 +385,7 @@ svg.trail .hoplabel {
    ============================================================ */
 @media (max-width: 600px) {
   /* Header wraps: title gets its own line, controls sit under it.
-     The pill + select + connect button then share one thumb row.
-     (2026-09-22 revert to the approved two-commit-ago layout; the
-     BLE/TCP labels stay, the select keeps its approved 150px box and
-     its approved position at the end of row 1.) */
+     The pill + select + connect button then share one thumb row. */
   header { flex-wrap: wrap; padding: 10px 12px; gap: 8px; }
   header h1 { font-size: 16px; flex: 0 1 auto; min-width: 0; }
   #conn-state { font-size: 12px; padding: 3px 8px; flex: 0 0 auto; }
@@ -405,12 +402,15 @@ svg.trail .hoplabel {
   .inputrow { flex-wrap: wrap; }
   .inputrow input { min-width: 0; flex: 1 1 160px; min-height: 44px; font-size: 16px; }
   /* The header's radio-name is NOT an .inputrow member - sized above. */
-  /* The source select: FIXED at its approved 150px box (Brett
-     2026-09-22: "keep the connection type box the same size" after
-     the BLE/TCP rename - short text must not shrink the box, and its
-     position (end of row 1, beside the title) is the approved one.
-     13px text - selects don't zoom-on-focus (no typing). */
-  #source-mode { font-size: 13px; width: 150px; flex: 0 0 150px; }
+  /* The source select is the space hog ("Radio (BLE companion)" is a
+     207px label at 16px). Selects don't suffer the zoom-on-focus
+     problem the way text inputs do (no typing, just a picker), so it
+     may shrink: capped width, smaller text, one compact controls
+     line. Measured 2026-09-22: pill 88 + select ~150 + connect 130
+     + gaps ~24 = ~392... still wide; so the select also truncates
+     its rendered text via width cap and the row wraps ONLY if truly
+     needed. */
+  #source-mode { font-size: 13px; max-width: 150px; min-width: 0; flex: 0 1 auto; }
 
   /* Radio-name stays IN the wrapped controls line (Brett: reclaim
      screen space, not a full row): compact, grows to share the line
@@ -419,15 +419,6 @@ svg.trail .hoplabel {
      native input behavior) so Connect+name genuinely share one row;
      16px keeps iOS zoom quiet. */
   #radio-name { flex: 1 1 110px; min-width: 0; font-size: 16px; padding: 6px 10px; }
-
-  /* Brett 2026-09-22: smaller hint type so the placeholder fits the
-     compact field. Only the PLACEHOLDER shrinks - typed text stays
-     16px, which is what iOS's zoom-on-focus measures. Placeholder
-     centered in the box (Brett): inputs honor text-align for their
-     hint AND typed text; once he's typing, left-aligned is the
-     natural reading position, so center only while EMPTY. */
-  #radio-name::placeholder { font-size: 12px; }
-  #radio-name:placeholder-shown { text-align: center; }
 
   main { padding: 10px 10px 72px; }
   .card { padding: 12px; border-radius: 14px; margin-bottom: 12px; }
