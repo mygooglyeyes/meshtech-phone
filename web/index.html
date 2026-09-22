@@ -27,11 +27,9 @@
     </select>
     <span id="conn-state" data-state="disconnected">disconnected</span>
     <button id="connect" class="primary">Connect</button>
+    <input id="radio-name" placeholder="Radio name (optional)" />
   </header>
   <main>
-    <div class="inputrow">
-      <input id="radio-name" placeholder="Radio name (optional, e.g. T-Beam)" />
-    </div>
     <div class="inputrow" id="node-link-row" hidden>
       <input id="node-host" placeholder="Host node address (e.g. 192.168.12.145)" />
       <input id="node-token" type="password" placeholder="Data-door password (once)" />
@@ -51,8 +49,26 @@
   <script>
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", () => {
-        navigator.serviceWorker.register("./sw.js").catch((err) =>
-          console.warn("service worker registration skipped:", String(err)));
+        // updateViaCache "none": the browser must NOT serve sw.js from
+        // its own HTTP cache - with header-less servers (python
+        // http.server, and hilltop's static handler) a stale worker
+        // could otherwise pin the OLD app forever (the 2026-09-21
+        // Ctrl+F5 wedge, root-caused 2026-09-22). check on every load.
+        navigator.serviceWorker.register("./sw.js", {updateViaCache: "none"})
+          .then((reg) => {
+            if (reg.waiting) reg.waiting.postMessage({type: "SKIP_WAITING"});
+            reg.addEventListener("updatefound", () => {
+              const w = reg.installing;
+              if (!w) return;
+              w.addEventListener("statechange", () => {
+                if (w.state === "installed" && navigator.serviceWorker.controller) {
+                  w.postMessage({type: "SKIP_WAITING"});
+                }
+              });
+            });
+          })
+          .catch((err) =>
+            console.warn("service worker registration skipped:", String(err)));
       });
     }
   </script>
