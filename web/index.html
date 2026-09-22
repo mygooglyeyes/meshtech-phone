@@ -8,9 +8,15 @@
        direct mode's feed link replaces the companion-radio link, so the
        page connects to the HOST NODE's ws:// address, not its own origin.
        Only ws:// is opened to the network; scripts/styles/forms stay self. -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' ws:; object-src 'none'; base-uri 'none'; form-action 'none'" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-BUFFY_COMPUTES_ME'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' ws:; object-src 'none'; base-uri 'none'; form-action 'none'" />
   <title>MeshTech Scope</title>
   <link rel="manifest" href="./manifest.webmanifest" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Scope" />
+  <link rel="icon" href="./icon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="./icon-192.png" />
 </head>
 <body>
   <header>
@@ -38,5 +44,17 @@
     </div>
   </main>
   <script type="module" src="/src/main.ts"></script>
+  <!-- Stage 1 (2026-09-22): the worker existed since the security
+       review but was never REGISTERED, so the app was never
+       installable. Register from the served origin only (sw.js is
+       same-origin by definition); failure is logged, never fatal. -->
+  <script>
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("./sw.js").catch((err) =>
+          console.warn("service worker registration skipped:", String(err)));
+      });
+    }
+  </script>
 </body>
 </html>

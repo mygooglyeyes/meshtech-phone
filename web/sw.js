@@ -11,8 +11,10 @@
  * - The previous `.catch(() => hit)` handed back a stale shell on any
  *   network failure with no way to recover; failures now surface.
  */
-const CACHE = "scope-shell-v1";
-const SHELL = ["./", "./index.html", "./manifest.webmanifest", "./icon.svg"];
+const CACHE = "scope-shell-v2";
+const SHELL = ["./", "./index.html", "./manifest.webmanifest", "./icon.svg",
+  "./icon-192.png", "./icon-512.png", "./icon-maskable-192.png",
+  "./icon-maskable-512.png"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)));
@@ -26,6 +28,11 @@ self.addEventListener("activate", (event) => {
   );
   self.clients.claim();
 });
+
+/* Stage 1 (2026-09-22): activated by index.html's register() call.
+ * The v1 -> v2 cache bump is deliberate: the first registered worker
+ * must not inherit any stale v1 entries from bench machines.
+ */
 
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;

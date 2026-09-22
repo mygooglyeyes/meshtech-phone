@@ -9,6 +9,8 @@ Uses esbuild through the Deno node-compat binary found on this machine
 """
 from __future__ import annotations
 
+import base64
+import hashlib
 import os
 import shutil
 import subprocess
@@ -87,13 +89,39 @@ def main() -> int:
     if shell_dir is not None:
         shutil.copy(shell_dir / "index.html", dist / "index.html")
         index = dist / "index.html"
-        html = index.read_text(encoding="utf-8").replace(
+        html = index.read_bytes().decode("utf-8").replace(
             '<script type="module" src="/src/main.ts"></script>',
             '<link rel="stylesheet" href="./app.css" />\n'
             '  <script type="module" src="./app.js"></script>')
-        index.write_text(html, encoding="utf-8")
 
-        for name in ("manifest.webmanifest", "icon.svg", "sw.js"):
+        # STAGE 1 CSP self-heal (2026-09-22): the SW-registration script
+        # is inline, so the policy carries its sha256. A hash pinned in
+        # the source would drift the moment git line-ending conversion
+        # or an editor re-save touches the file (caught live: CRLF
+        # working copy vs LF-authored hash). The build hashes the ACTUAL
+        # bytes it is about to ship and rewrites the policy tag - the
+        # pair can never disagree again. Non-inline-script policies are
+        # left untouched (no hash marker present).
+        CSP_MARK = "sha256-BUFFY_COMPUTES_ME"
+        if CSP_MARK in html:
+            import base64
+            import re as _re
+            m = _re.search(r"<script>(.*?)</script>", html, _re.S)
+            if not m:
+                raise SystemExit("CSP marker present but no inline script found")
+            body = m.group(1)
+            # Chromium normalizes CRLF to LF while parsing; its CSP
+            # hash is computed over the NORMALIZED body. Match that
+            # or the hash pair breaks on CRLF working copies (live
+            # lesson 2026-09-22).
+            body = body.replace("\r\n", "\n")
+            b64 = base64.b64encode(hashlib.sha256(body.encode("utf-8")).digest()).decode()
+            html = html.replace(CSP_MARK, f"sha256-{b64}")
+        index.write_bytes(html.encode("utf-8"))
+
+        for name in ("manifest.webmanifest", "icon.svg", "sw.js",
+                     "icon-192.png", "icon-512.png",
+                     "icon-maskable-192.png", "icon-maskable-512.png"):
             if (shell_dir / name).exists():
                 shutil.copy(shell_dir / name, dist / name)
     else:
