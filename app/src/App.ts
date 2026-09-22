@@ -609,8 +609,8 @@ export function boot(): void {
     render();
   });
   render();
-  logLine("Scope client ready. Radio mode: connect a #scope companion. " +
-    "Direct mode: connect meshtech-node (no radio needed).");
+  logLine("Scope client ready. BLE: connect a #scope companion radio. " +
+    "TCP: connect meshtech-node (no radio needed).");
 }
 
 if (typeof document !== "undefined") {
