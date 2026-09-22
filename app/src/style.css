@@ -397,7 +397,7 @@ svg.trail .hoplabel {
      auto-zoom-on-focus, which fights the fixed layout. */
   .inputrow { flex-wrap: wrap; }
   .inputrow input { min-width: 0; flex: 1 1 160px; min-height: 44px; font-size: 16px; }
-  #source-mode { font-size: 16px; }
+  #source-mode { font-size: 16px; max-width: 150px; min-width: 0; }
 
   /* Radio-name on the pill+Connect row: sized to FIT that line -
      flex-shrink lets it give way when the pill label grows
