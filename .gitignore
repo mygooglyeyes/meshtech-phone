@@ -1,0 +1,11 @@
+# .gitignore for meshtech-phone
+node_modules/
+__pycache__/
+*.pyc
+.venv/
+dist/
+android/*.keystore
+android/*.jks
+android/build-output/
+*.log
+.DS_Store

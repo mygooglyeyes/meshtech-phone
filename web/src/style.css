@@ -1,0 +1,356 @@
+:root {
+  --bg: #0b0e14;
+  --card: #161b23;
+  --line: #232b36;
+  --text: #e6ebf2;
+  --muted: #8b98a8;
+  --accent: #4da3ff;
+  --good: #3ecf8e;
+  --warn: #ffb454;
+  /* Spaceship gloss (Brett 2026-09-18): every panel is a beveled
+     hull plate - light catches the top edge, shadow pools at the
+     bottom, and screens are recessed INSET like cockpit displays.
+     v2: taller plates - wider bevels and a deeper drop so cards
+     visibly float off the background (Brett: "farther from the
+     background"). */
+  --panel-hi: rgba(255, 255, 255, 0.14);   /* top edge catchlight */
+  --panel-lo: rgba(0, 0, 0, 0.7);          /* bottom edge shade   */
+  --panel-edge: rgba(126, 156, 196, 0.38); /* cool metal rim      */
+  --panel-drop: 0 16px 40px rgba(0, 0, 0, 0.65), 0 4px 10px rgba(0, 0, 0, 0.5);
+  --panel-grad: linear-gradient(180deg, #1c2534 0%, #121822 100%);
+  --screen-bg: #070a10;                    /* recessed displays   */
+  --screen-inset: inset 0 2px 8px rgba(0, 0, 0, 0.75),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.5);
+  /* v2 (Brett): outer glow on screens is smaller and harder - a thin
+     rim light, not a soft bloom. */
+  --glow-accent: 0 0 3px rgba(77, 163, 255, 0.35);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  /* Deep-space vignette instead of flat black. */
+  background: radial-gradient(1200px 700px at 50% -8%, #14202f, var(--bg) 62%);
+  color: var(--text);
+  font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--panel-grad);
+  border-bottom: 1px solid var(--panel-edge);
+  /* Status-strip glow under the console bar. */
+  box-shadow: 0 2px 14px rgba(0, 0, 0, 0.55),
+    inset 0 1px 0 var(--panel-hi),
+    inset 0 -2px 6px rgba(77, 163, 255, 0.12);
+  position: sticky;
+  top: 0;
+  z-index: 5;
+}
+
+header h1 { font-size: 18px; margin: 0; flex: 1; text-shadow: 0 1px 2px rgba(0,0,0,.6); }
+
+#conn-state {
+  font-size: 13px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--panel-edge);
+  background: var(--screen-bg);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.7),
+    inset 0 -1px 0 var(--panel-hi);
+  color: var(--muted);
+}
+#conn-state[data-state="connected"] { color: var(--good); border-color: var(--good); }
+#conn-state[data-state="connecting"] { color: var(--warn); }
+
+main { padding: 12px 16px 80px; max-width: 720px; margin: 0 auto; }
+
+.card {
+  /* Hull plate: gradient panel, catchlight top edge, shade bottom.
+     v2: 2px bevels (was 1px) + a mid-plate shade line for thickness. */
+  background: var(--panel-grad);
+  border: 1px solid var(--panel-edge);
+  border-radius: 16px;
+  padding: 14px 16px;
+  margin-bottom: 16px;
+  box-shadow: var(--panel-drop),
+    inset 0 2px 0 var(--panel-hi),
+    inset 0 -2px 0 var(--panel-lo),
+    inset 0 10px 18px -12px rgba(0, 0, 0, 0.5);
+}
+
+.card h3 { margin: 0 0 10px; font-size: 16px; }
+
+.muted { color: var(--muted); font-size: 13px; }
+
+.statgrid {
+  display: grid;
+  /* Three columns when the card fits them (5 stats = 3 + 2 neat
+     rows), 2 on narrow phones. A hard 2 made the 5th stat orphan
+     into a lone left cell (Brett, 2026-09-21). */
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px 16px;
+  margin-bottom: 10px;
+}
+.statgrid .big { display: block; font-size: 22px; font-weight: 600; }
+.statgrid > div { color: var(--muted); font-size: 12px; }
+
+/* ---- Area map (replaces the old button-grid placeholder) ------- */
+svg.areamap {
+  width: 100%;
+  aspect-ratio: 1;
+  margin: 8px 0;
+  border-radius: 12px;
+  /* The map is a VIEWSCREEN: recessed screen with a metal rim. */
+  background: var(--screen-bg);
+  border: 1px solid var(--panel-edge);
+  box-shadow: var(--screen-inset), var(--glow-accent);
+}
+svg.areamap .water { fill: #080d16; }
+svg.areamap .land { fill: #182234; stroke: #223048; stroke-width: 0.004; }
+svg.areamap .cover {
+  fill: rgba(27, 34, 48, 0.35);
+  stroke: #d5dde8;
+}
+svg.areamap .gridline { stroke: #39434f; }
+svg.areamap .heat { fill: var(--accent); }
+svg.areamap .ghost {
+  /* Faint fill + hard outline = the ghost watermark. NO paint-server
+     gradients here: shared url(#id) fills mis-rendered as a solid
+     gray block on some engines (2026-09-18). */
+  fill: rgba(139, 152, 168, 0.06);
+  stroke: #8b98a8;
+  font-weight: 700;
+  font-family: inherit;
+  pointer-events: none;
+  opacity: 0.2;
+}
+svg.areamap .cell { fill: transparent; cursor: pointer; }
+svg.areamap .cell:hover { fill: rgba(77, 163, 255, 0.08); }
+svg.areamap .cellcount {
+  fill: #6b7889;
+  font-weight: 400;
+  opacity: 0.55;
+  pointer-events: none;
+}
+svg.areamap .dot { stroke: #0b0e13; stroke-width: 0.001; }
+/* Section-detail dots doubled (Brett 2026-09-18). */
+svg.areamap.sectionmap .dot { stroke-width: 0.002; }
+svg.areamap .dot-repeater { fill: var(--good); }
+svg.areamap .dot-companion { fill: var(--accent); }
+svg.areamap .dot-unknown { fill: var(--muted); }
+
+/* Section-detail map: same family, zoomed to one section. */
+svg.areamap.sectionmap { aspect-ratio: auto; height: 300px; }
+svg.areamap .sqdim { fill: rgba(27, 34, 48, 0.45); }
+svg.areamap .sectbounds {
+  fill: transparent;
+  stroke: var(--accent);
+  stroke-width: 0.003;
+}
+svg.areamap .route-ghost {
+  opacity: 0;
+  pointer-events: none;
+}
+svg.areamap .route-ghost.show { opacity: 1; }
+svg.areamap .route-ghost polyline {
+  fill: none;
+  stroke: var(--warn);
+  stroke-width: 2px;
+  stroke-dasharray: 6 4;
+  opacity: 0.8;
+}
+svg.areamap .route-ghost circle {
+  fill: var(--warn);
+  opacity: 0.7;
+}
+
+/* Graphical arrow inside route-row names. */
+.rname .rarrow {
+  color: var(--accent);
+  font-weight: 700;
+  padding: 0 2px;
+}
+
+button.route {
+  width: 100%;
+  text-align: left;
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  margin-bottom: 6px;
+  border-radius: 10px;
+  border: 1px solid var(--panel-edge);
+  background: var(--panel-grad);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 var(--panel-hi),
+    inset 0 -1px 0 var(--panel-lo);
+  transition: box-shadow 120ms ease, transform 120ms ease;
+}
+button.route:hover {
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 var(--panel-hi),
+    inset 0 -1px 0 var(--panel-lo),
+    var(--glow-accent);
+}
+.route .rmuted { color: var(--muted); font-size: 13px; }
+
+button.primary {
+  /* Primary buttons glow like a lit console switch. */
+  background: linear-gradient(180deg, #63b2ff, #3d8fe6);
+  color: #06121f;
+  border: none;
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-right: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.45),
+    inset 0 -2px 4px rgba(0, 40, 80, 0.35),
+    var(--glow-accent);
+}
+button.primary:disabled { opacity: 0.5; }
+
+#connect { min-width: 110px; }
+/* Connected: pressed-in plate (inset shadow, no glow) so the state
+   reads at a glance - the label says "- Disconnect" beside it. */
+#connect[data-mode="connected"] {
+  background: linear-gradient(180deg, #10161f 0%, #1a2330 100%);
+  box-shadow:
+    inset 0 2px 4px rgba(0, 10, 20, 0.65),
+    inset 0 -1px 2px rgba(90, 130, 180, 0.18);
+  color: var(--good);
+  border-color: var(--good);
+}
+
+#log {
+  font: 12px/1.5 ui-monospace, Menlo, Consolas, monospace;
+  color: var(--muted);
+  max-height: 140px;
+  overflow: auto;
+  background: var(--screen-bg);
+  border: 1px solid var(--panel-edge);
+  border-radius: 10px;
+  padding: 8px 10px;
+  box-shadow: var(--screen-inset);
+}
+
+.filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--muted, #8b93a1);
+  margin: 4px 0 8px;
+  cursor: pointer;
+}
+
+.filter input[type="checkbox"] {
+  accent-color: var(--accent, #4da3ff);
+  width: 15px;
+  height: 15px;
+}
+
+svg.trail {
+  width: 100%;
+  height: 220px;
+  background: var(--screen-bg);
+  border-radius: 10px;
+  border: 1px solid var(--panel-edge);
+  /* Same recessed cockpit-display treatment as the map. */
+  box-shadow: var(--screen-inset), var(--glow-accent);
+}
+svg.trail circle { fill: var(--accent); }
+svg.trail polyline { stroke: var(--accent); stroke-width: 0.005; fill: none; opacity: 0.5; }
+
+/* Trail aging states (outpost-inspired; TODOS #16). The base line
+   stays; the class only changes its look - a ghost never disappears
+   entirely, it dims (honest: the route still exists, it went quiet). */
+svg.trail.aging-fading polyline { opacity: 0.3; }
+svg.trail.aging-fading circle { opacity: 0.45; }
+svg.trail.aging-overdue polyline {
+  opacity: 0.55;
+  stroke-dasharray: 0.012 0.008;
+}
+svg.trail.aging-overdue circle { opacity: 0.4; }
+svg.trail.aging-overdue circle.pulse, svg.trail.aging-ghost circle.pulse {
+  display: none;
+}
+svg.trail.aging-ghost polyline { opacity: 0.15; }
+svg.trail.aging-ghost polyline { stroke-dasharray: 0.005 0.01; }
+svg.trail.aging-ghost circle { opacity: 0.2; }
+svg.trail circle.pulse { fill: var(--warn); opacity: 0.95; }
+svg.trail circle.pulsetail { fill: var(--warn); pointer-events: none; }
+/* Soft ghostly halo so the moving dot reads at a glance. */
+svg.trail circle.pulse { filter: drop-shadow(0 0 0.003 var(--warn)); }
+/* AUTOPLAY (Brett 2026-09-18): the trail plays on open by design,
+   so the pulse survives a reduced-motion OS setting. */
+svg.trail circle.pulse { display: initial !important; }
+/* Small node labels beside trail hops (Brett 2026-09-18). Sized in
+   viewBox units: SVG text does NOT honor CSS px here (the old
+   11px-count bug rendered digits as giant gray slabs). */
+svg.trail .hoplabel {
+  font-size: 0.003px;
+  fill: #aeb8c6;
+  opacity: 0.9;
+  paint-order: stroke;
+  stroke: #0b0e13;
+  stroke-width: 0.0008px;
+  pointer-events: none;
+}
+
+/* Reduced motion: the pulse still plays (autoplay by design), but
+   the halo is dropped to keep the page calm. */
+@media (prefers-reduced-motion: reduce) {
+  svg.trail circle.pulse { filter: none; }
+}
+
+.aging {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  vertical-align: middle;
+}
+.aging-fresh { color: var(--good); border-color: var(--good); }
+.aging-overdue { color: var(--warn); border-color: var(--warn); }
+
+.inputrow { display: flex; gap: 8px; margin: 8px 0 12px; }
+/* JS shows/hides rows via the hidden attribute - this rule must win
+ * over the flex display above or the row stays visible (caught live
+ * 2026-09-21: the radio-name row shadowed the host/password row). */
+.inputrow[hidden] { display: none; }
+.inputrow input {
+  flex: 1;
+  background: var(--screen-bg);
+  border: 1px solid var(--panel-edge);
+  color: var(--text);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font: inherit;
+  box-shadow: var(--screen-inset);
+}
+
+/* Source selector (radio | direct) - spaceship-panel styling to match */
+#source-mode {
+  background: var(--screen-bg);
+  border: 1px solid var(--panel-edge);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 6px 8px;
+  font: inherit;
+  font-size: 12px;
+  box-shadow: var(--screen-inset);
+}
+#source-mode:disabled { opacity: .5; }
