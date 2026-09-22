@@ -222,22 +222,9 @@ button.primary:disabled { opacity: 0.5; }
 
 #connect { min-width: 110px; }
 
-/* Radio-name: lives IN the header's control row (Brett 2026-09-22,
-   reclaim screen space) - small, neat, beside Connect. On narrow
-   phones it wraps to the controls' second line at a hand-friendly
-   width instead of hogging a full-width row of its own. */
-#radio-name {
-  width: 150px;
-  flex: 0 1 auto;
-  background: var(--screen-bg);
-  border: 1px solid var(--panel-edge);
-  color: var(--text);
-  border-radius: 8px;
-  padding: 6px 8px;
-  font: inherit;
-  font-size: 12px;
-  box-shadow: var(--screen-inset);
-}
+/* Radio-name (2026-09-22 rollback to the FIRST stage-1 rendering): a
+   normal .inputrow member again - the header-placement experiment is
+   undone. Styling comes from .inputrow input below. */
 #radio-name:disabled { opacity: .5; }
 #radio-name::placeholder { color: var(--muted); }
 /* Connected: pressed-in plate (inset shadow, no glow) so the state
@@ -346,9 +333,6 @@ svg.trail .hoplabel {
 .aging-overdue { color: var(--warn); border-color: var(--warn); }
 
 .inputrow { display: flex; gap: 8px; margin: 8px 0 12px; }
-/* A row whose only input moved into the header collapses away; keep
-   the rule for the direct-mode host/password row. */
-.inputrow:empty { display: none; }
 /* JS shows/hides rows via the hidden attribute - this rule must win
  * over the flex display above or the row stays visible (caught live
  * 2026-09-21: the radio-name row shadowed the host/password row). */
@@ -387,8 +371,8 @@ svg.trail .hoplabel {
   /* Header wraps: title gets its own line, controls sit under it.
      The pill + select + connect button then share one thumb row. */
   header { flex-wrap: wrap; padding: 10px 12px; gap: 8px; }
-  header h1 { font-size: 16px; flex: 0 1 auto; min-width: 0; }
-  #conn-state { font-size: 12px; padding: 3px 8px; flex: 0 0 auto; }
+  header h1 { font-size: 16px; }
+  #conn-state { font-size: 12px; padding: 3px 8px; }
 
   /* Fingers, not cursors: 44px touch targets on everything tappable
      (the Apple/Android human-interface floor). */
@@ -401,24 +385,7 @@ svg.trail .hoplabel {
      auto-zoom-on-focus, which fights the fixed layout. */
   .inputrow { flex-wrap: wrap; }
   .inputrow input { min-width: 0; flex: 1 1 160px; min-height: 44px; font-size: 16px; }
-  /* The header's radio-name is NOT an .inputrow member - sized above. */
-  /* The source select is the space hog ("Radio (BLE companion)" is a
-     207px label at 16px). Selects don't suffer the zoom-on-focus
-     problem the way text inputs do (no typing, just a picker), so it
-     may shrink: capped width, smaller text, one compact controls
-     line. Measured 2026-09-22: pill 88 + select ~150 + connect 130
-     + gaps ~24 = ~392... still wide; so the select also truncates
-     its rendered text via width cap and the row wraps ONLY if truly
-     needed. */
-  #source-mode { font-size: 13px; max-width: 150px; min-width: 0; flex: 0 1 auto; }
-
-  /* Radio-name stays IN the wrapped controls line (Brett: reclaim
-     screen space, not a full row): compact, grows to share the line
-     with the state pill and Connect. min-width:0 lets it shrink
-     under its placeholder's width (the placeholder truncates -
-     native input behavior) so Connect+name genuinely share one row;
-     16px keeps iOS zoom quiet. */
-  #radio-name { flex: 1 1 110px; min-width: 0; font-size: 16px; padding: 6px 10px; }
+  #source-mode { font-size: 16px; }
 
   main { padding: 10px 10px 72px; }
   .card { padding: 12px; border-radius: 14px; margin-bottom: 12px; }
