@@ -419,6 +419,10 @@ svg.trail .hoplabel {
      native input behavior) so Connect+name genuinely share one row;
      16px keeps iOS zoom quiet. */
   #radio-name { flex: 1 1 110px; min-width: 0; font-size: 16px; padding: 6px 10px; }
+  /* Brett 2026-09-22: smaller hint type so the placeholder fits the
+     compact field. Only the PLACEHOLDER shrinks - typed text stays
+     16px, which is what iOS's zoom-on-focus measures. */
+  #radio-name::placeholder { font-size: 12px; }
 
   main { padding: 10px 10px 72px; }
   .card { padding: 12px; border-radius: 14px; margin-bottom: 12px; }
