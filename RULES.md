@@ -35,6 +35,17 @@ first, then PROJECT.md (meshtech-node), then this.
 - Commands Brett runs go in a fenced code block (copy button works).
 - Honest gaps: "I don't know" beats a guess dressed as a fact.
 
+## Versioning (Brett, 2026-09-22 - same as meshtech-node)
+
+- Same format as meshtech-node: **NN.NNN.NNN** (currently
+  00.000.NNN, counting pushes; meshtech-node is at 00.000.032).
+- This repo counts its OWN pushes, starting at **00.000.001** on the
+  next push (the seed push was the pre-versioning seed).
+- meshtech-node keeps its single pyproject.toml version line; this
+  repo's build.py will carry the same line for the web bundle -
+  bumped on every commit-and-push Brett OKs. Never invented,
+  always counted.
+
 ## Repo rules
 
 - web/ is the single source of truth for app code. android/ and
