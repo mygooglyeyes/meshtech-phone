@@ -354,3 +354,51 @@ svg.trail .hoplabel {
   box-shadow: var(--screen-inset);
 }
 #source-mode:disabled { opacity: .5; }
+
+/* ============================================================
+   STAGE 1: phone layout (2026-09-22, Brett's stage-1 go).
+   Same panels, same identity - the cockpit just re-arranges for a
+   hand-held screen. Rules here only relax sizes/wrap; nothing is
+   removed, so the desktop look is untouched above 600px.
+   ============================================================ */
+@media (max-width: 600px) {
+  /* Header wraps: title gets its own line, controls sit under it.
+     The pill + select + connect button then share one thumb row. */
+  header { flex-wrap: wrap; padding: 10px 12px; gap: 8px; }
+  header h1 { font-size: 16px; }
+  #conn-state { font-size: 12px; padding: 3px 8px; }
+
+  /* Fingers, not cursors: 44px touch targets on everything tappable
+     (the Apple/Android human-interface floor). */
+  button { min-height: 44px; }
+  button.primary { min-height: 44px; padding: 10px 16px; }
+  button.route { min-height: 48px; padding: 12px; }
+  #connect { min-width: 130px; }
+
+  /* 16px on inputs/selects: smaller triggers iOS Safari's
+     auto-zoom-on-focus, which fights the fixed layout. */
+  .inputrow { flex-wrap: wrap; }
+  .inputrow input { min-width: 0; flex: 1 1 160px; min-height: 44px; font-size: 16px; }
+  #source-mode { font-size: 16px; }
+
+  main { padding: 10px 10px 72px; }
+  .card { padding: 12px; border-radius: 14px; margin-bottom: 12px; }
+  .card h3 { font-size: 15px; }
+
+  /* Stats: a hair tighter so five fit two-per-row comfortably. */
+  .statgrid { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px 10px; }
+  .statgrid .big { font-size: 19px; }
+
+  /* Fixed-height canvases become width-relative so a narrow phone
+     shows the full map/trail without letterboxing. */
+  svg.areamap.sectionmap { height: min(58vw, 300px); }
+  svg.trail { height: min(52vw, 220px); }
+
+  #log { max-height: 110px; font-size: 11px; padding: 6px 8px; }
+}
+
+/* Touch devices have no hover: the map-cell highlight must not be
+   hover-only there. A tap sets :active, so mirror the hover fill. */
+@media (hover: none) {
+  svg.areamap .cell:active { fill: rgba(77, 163, 255, 0.08); }
+}

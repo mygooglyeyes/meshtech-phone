@@ -5,7 +5,8 @@ note at the bottom when finished.
 
 ## In progress
 
-- (none - branch layout just built, awaiting Brett's push word)
+- (none - session closed for the night 2026-09-22 ~01:00, Brett's
+  order; v00.000.001 pushed)
 
 ## Next up (awaiting Brett's pick)
 
