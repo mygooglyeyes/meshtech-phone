@@ -84,6 +84,9 @@ let selectedSect: SectSum | null = null;
 let selectedRt = state.routes.get(0x0221) || null;
 let repeatersOnly = false;
 let showSectionNumbers = true;
+// Feed health collapsible (Brett 2026-09-22) - same pattern as App.ts:
+// the map is the main event; stats shrink to a title + carat row.
+let feedHealthOpen = false;
 
 function render(): void {
   const h = state.health;
@@ -200,7 +203,7 @@ function render(): void {
         host has not classified always stay visible.</p>`
       : "";
     inner.innerHTML = `
-      <div class="card"><h3>Feed health</h3>
+      <div class="card collapsible${feedHealthOpen ? "" : " collapsed"}"><h3 id="fh-toggle" class="fhtoggle">Feed health <span class="chev">${feedHealthOpen ? "▾" : "▸"}</span></h3>
         <div class="statgrid">
           <div><span class="big">${h.activeTotal}</span>active nodes</div>
           <div><span class="big">${h.rxPerHour}</span>mesh RX/hour</div>
@@ -260,6 +263,11 @@ function render(): void {
   });
   inner.querySelector("#show-section-numbers")?.addEventListener("change", (e) => {
     showSectionNumbers = (e.target as HTMLInputElement).checked;
+    render();
+  });
+  // Collapsible Feed health: whole title row is the tap target.
+  inner.querySelector("#fh-toggle")?.addEventListener("click", () => {
+    feedHealthOpen = !feedHealthOpen;
     render();
   });
   // Demo stand-in for a live packet: replays the moving dot ONCE,
