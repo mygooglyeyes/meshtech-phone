@@ -318,7 +318,7 @@ function renderFeedHealth(): string {
       <div><span class="big">${mapped}</span>mapped nodes</div>
       <div><span class="big">${h.rxPerHour ?? "?"}</span>mesh RX/hour</div>
       <div><span class="big">${h.feedAirtimeSPerH ?? "?"}s</span>feed TX/hour (est.)</div>
-      <div><span class="big">${age}</span>since last pulse</div>
+      <div><span class="big" id="pulse-age">${age}</span>since last pulse</div>
     </div></div>`;
 }
 
@@ -335,7 +335,15 @@ renderFeedHealth.age = (): string => {
   return `${mm}:${ss}`;   // Brett: minutes:seconds, never mental math
 };
 setInterval(() => {
-  if (state.health.lastPulseTs != null) render();
+  // TICK-ONLY CLOCK (2026-09-23, the dropdown-killer): this timer used
+  // to re-render the WHOLE page every second, so any open <select>
+  // (the Map size box) snapped shut before a finger could reach an
+  // option - Brett saw the whole page flash ~1/s. Now it updates only
+  // the pulse-age text; the rest repaints on real events (packets,
+  // connection changes, user input).
+  if (state.health.lastPulseTs == null) return;
+  const ageEl = document.getElementById("pulse-age");
+  if (ageEl) ageEl.textContent = renderFeedHealth.age();
 }, 1000);
 
 function renderMap(): string {

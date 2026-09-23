@@ -15,8 +15,12 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+# Repo layout after the restructure: app/ = shared source + build.py
+# + dist/, web/ = browser shell. (This tool still said web/ for both -
+# caught live 2026-09-23 when the sync refused to run.)
+APP = ROOT / "app"
 WEB = ROOT / "web"
-DIST = WEB / "dist"
+DIST = APP / "dist"
 NODE = Path(r"C:\projects\meshtech-node")
 NODE_APP = NODE / "app"
 
@@ -29,8 +33,8 @@ def main() -> int:
     build = "--no-build" not in sys.argv
     if build:
         print("== building web/ ==")
-        r = subprocess.run([sys.executable, str(WEB / "build.py"), "--test"],
-                           cwd=str(WEB))
+        r = subprocess.run([sys.executable, str(APP / "build.py"), "--test"],
+                           cwd=str(APP))
         if r.returncode != 0:
             print("BUILD FAILED - nothing synced (tests gate the sync)")
             return 1
