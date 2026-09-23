@@ -306,7 +306,38 @@ export class ScopeState {
   }
 
   /**
-   * Class-filter view of known nodes.
+   * ONE DOT PER NAME (2026-09-23, Brett's corrected design): the map
+   * draws identities, and identities MOVE - so the freshest advert
+   * for a name wins and older same-name entries never draw a second
+   * dot. The server now keeps exactly one current record per name;
+   * this collapse handles what the server cannot see: two entries
+   * still in flight on the wire when the retire happened (an INTRO is
+   * a whole-roster snapshot; the next one arrives already merged),
+   * and nameless duplicates stay visible (nothing to collapse BY).
+   * The server's own observation table is built the same way.
+   */
+  dotNodes(): NodeInfo[] {
+    const winnerByName = new Map<string, NodeInfo>();
+    const nameless: NodeInfo[] = [];
+    for (const n of this.nodes.values()) {
+      if (!n.name) {
+        nameless.push(n);
+        continue;
+      }
+      const cur = winnerByName.get(n.name);
+      // > or = : the freshest advert wins, and an exact timestamp tie
+      // (two INTROs decoded in the same millisecond) goes to the
+      // latest arrival - insertion order is arrival order.
+      if (!cur || (n.lastIntroTs ?? 0) >= (cur.lastIntroTs ?? 0)) {
+        winnerByName.set(n.name, n);
+      }
+    }
+    return [...winnerByName.values(), ...nameless];
+  }
+
+  /**
+   * Class-filter view of known nodes, collapsed to one dot per name
+   * (dotNodes rule) so the map and every count it feeds agree.
    * repeatersOnly=true keeps repeaters AND unknown-class nodes: the
    * host publishes class only when its source data knows it, so
    * hiding unknowns would silently drop real repeaters (dishonest).
@@ -315,7 +346,7 @@ export class ScopeState {
   filteredNodes(repeatersOnly: boolean): {
     kept: NodeInfo[]; hidden: number;
   } {
-    const all = [...this.nodes.values()];
+    const all = this.dotNodes();
     if (!repeatersOnly) return { kept: all, hidden: 0 };
     const kept = all.filter(
       (n) => (n.nodeClass ?? 0) !== NODE_CLASS_COMPANION);

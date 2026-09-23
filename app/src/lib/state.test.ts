@@ -100,6 +100,64 @@ test("two different nodes close together stay two dots", () => {
       lon: HOME.centerLon },
   ], 60000));
   assert.strictEqual(s.nodes.size, 2);   // never merged: different names
+  assert.strictEqual(s.dotNodes().length, 2);
+});
+
+// ONE DOT PER NAME (2026-09-23, Brett's corrected design): identities
+// MOVE, so the freshest advert for a name wins and older same-name
+// entries never draw a second dot. The server retires the old row the
+// moment the fresh advert lands; the collapse here covers the wire
+// window before the next INTRO arrives (an INTRO is a whole-roster
+// snapshot - the next one is already merged).
+test("map draws ONE dot for a name that arrived under two prefixes", () => {
+  const s = new ScopeState();
+  s.apply(HOME as unknown as Layout);
+  s.apply(liveIntro([
+    { prefix: 0x3b, name: "KN6OBW DT", lat: HOME.centerLat + 0.01,
+      lon: HOME.centerLon },
+  ], 60000));
+  // the same physical node, heard under a second identity later
+  s.apply(liveIntro([
+    { prefix: 0xa8, name: "KN6OBW DT", lat: HOME.centerLat + 0.02,
+      lon: HOME.centerLon },
+  ], 60000));
+  assert.strictEqual(s.nodes.size, 2);        // store keeps both facts
+  const dots = s.dotNodes();
+  assert.strictEqual(dots.length, 1);         // the map draws ONE dot
+  assert.strictEqual(dots[0].prefix, 0xa8);   // the FRESHEST advert wins
+  assert.ok(Math.abs(dots[0].lat! - (HOME.centerLat + 0.02)) < 1e-4);
+});
+
+test("nameless duplicates are never collapsed (nothing to collapse BY)", () => {
+  const s = new ScopeState();
+  s.apply(HOME as unknown as Layout);
+  s.apply(liveIntro([
+    { prefix: 0x60, name: "", lat: HOME.centerLat + 0.01,
+      lon: HOME.centerLon },
+    { prefix: 0x61, name: "", lat: HOME.centerLat + 0.01,
+      lon: HOME.centerLon },
+  ], 60000));
+  // nameless entries stay their own dots - a missing name proves
+  // nothing; silently dropping a real node would be dishonest.
+  assert.strictEqual(s.dotNodes().length, 2);
+});
+
+test("mapped count agrees with the drawn dots", () => {
+  const s = new ScopeState();
+  s.apply(HOME as unknown as Layout);
+  s.apply(liveIntro([
+    { prefix: 0x3b, name: "KN6OBW DT", lat: HOME.centerLat + 0.01,
+      lon: HOME.centerLon },
+    { prefix: 0xa8, name: "KN6OBW DT", lat: HOME.centerLat + 0.02,
+      lon: HOME.centerLon },
+    { prefix: 0x71, name: "Lonely", lat: HOME.centerLat + 0.03,
+      lon: HOME.centerLon },
+  ], 60000));
+  // 2 drawn dots (KN6OBW DT collapsed to the freshest, Lonely), not 3.
+  const inside = s.dotNodes().filter((n) =>
+    n.lat! >= s.geometry!.south && n.lat! <= s.geometry!.north &&
+    n.lon! >= s.geometry!.west && n.lon! <= s.geometry!.east);
+  assert.strictEqual(inside.length, 2);
 });
 
 runIfMain();

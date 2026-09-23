@@ -162,7 +162,7 @@ function render(): void {
       squareWest: state.geometry!.west,
       squareSouth: state.geometry!.south,
       squareSpan: state.geometry!.spanDeg,
-      nodes: [...state.nodes.values()],
+      nodes: state.dotNodes(),   // one dot per name (map = counts)
       hoverRoutes: selectedSect.routeStubs
         .map((rid) => state.routes.get(rid))
         .filter((rt): rt is NonNullable<typeof rt> => !!rt)
@@ -225,7 +225,7 @@ function render(): void {
           south: state.geometry!.south,
           spanDeg: state.geometry!.spanDeg,
           counts: h.sectionCounts ?? [],
-          nodes: [...state.nodes.values()],
+          nodes: state.dotNodes(),   // one dot per name (map = counts)
           showSectionNumbers,
         })}
         ${filterNote}
