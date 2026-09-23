@@ -91,6 +91,11 @@ const direct = new DirectClient({
     chip.textContent = s + (detail ? ` - ${detail}` : "");
     chip.dataset.state = s === "connected" ? "connected" : s;
     syncConnectButton(s === "connected", s === "connecting");
+    // LINK-row honesty (Brett 2026-09-22): once connected, the host/
+    // password boxes only take space - the link is live, nothing to
+    // type. They return the moment the link drops (any non-connected
+    // state), so a failed connect can be edited immediately.
+    el<HTMLDivElement>("node-link-row").hidden = s === "connected";
   },
   onPacket: (packet, meta) => {
     logLine(tagSource(
@@ -306,8 +311,12 @@ setInterval(() => {
 }, 1000);
 
 function renderMap(): string {
+  // Map refresh lives ON the map card now (Brett 2026-09-22): a small
+  // button pinned top-right of the card title row. Same handler as
+  // before (wired by id in boot()); only its home moved.
+  const refreshBtn = `<button id="refresh-map" class="maprefresh">Map refresh</button>`;
   if (!state.geometry) {
-    return `<div class="card"><h3>Map</h3>
+    return `<div class="card"><h3>Map ${refreshBtn}</h3>
       <p class="muted">Waiting for the area LAYOUT packet from the host
       (broadcast hourly, and at host start)...</p></div>`;
   }
@@ -331,7 +340,7 @@ function renderMap(): string {
   // areamap.ts <title> tooltips. Keep it that way.
   return `<div class="card"><h3>${esc(state.layout?.name || "Area")}
     <span class="muted">(${state.geometry.grid}x${state.geometry.grid},
-    ~${Math.round(state.geometry.spanM / 1000)} km across)</span></h3>
+    ~${Math.round(state.geometry.spanM / 1000)} km across)</span>${refreshBtn}</h3>
     <label class="filter"><input type="checkbox" id="filter-repeaters"
       ${repeatersOnly ? "checked" : ""}/> Repeaters only</label>
     <label class="filter"><input type="checkbox" id="show-section-numbers"
@@ -569,6 +578,12 @@ function render(): void {
   inner.querySelector("button#refresh-route")?.addEventListener("click", () => {
     if (selectedRoute != null) sendRefresh(REFRESH_KIND_ROUTE, selectedRoute);
   });
+  // Map refresh now lives ON the map card (Brett 2026-09-22) - the
+  // card re-renders, so the wiring rides here (optional-chain: also
+  // absent on the section-detail view).
+  inner.querySelector("button#refresh-map")?.addEventListener("click", () => {
+    sendRefresh(REFRESH_KIND_SECTION, REFRESH_WHOLE_AREA);
+  });
   // Route-row hover -> reveal that route's ghost path on the map
   // (same as the demo bench; a no-op on touch screens).
   inner.querySelectorAll("button.route[data-hover]").forEach((b) => {
@@ -583,9 +598,6 @@ function render(): void {
 
 export function boot(): void {
   el<HTMLButtonElement>("connect").addEventListener("click", onConnect);
-  el<HTMLButtonElement>("refresh-map").addEventListener("click", () => {
-    sendRefresh(REFRESH_KIND_SECTION, REFRESH_WHOLE_AREA); // whole-area refresh
-  });
   // DIRECT mode switch (bench): one source at a time, chosen here.
   el<HTMLSelectElement>("source-mode").addEventListener("change", async (e) => {
     const mode = (e.target as HTMLSelectElement).value as "radio" | "direct";
