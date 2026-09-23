@@ -29,7 +29,10 @@ const state = new ScopeState();
 // the trail is a static readout (Brett 2026-09-18).
 let routeUpdateFlash: number | null = null;
 const client = new MeshClient({
-  onState: (s: LinkState, detail?: string) => renderConnection(s, detail),
+  onState: (s: LinkState, detail?: string) => {
+    renderConnection(s, detail);
+    if (s === "connected") maybeAutoRefresh();
+  },
   // RX VISIBILITY (live-link debugging 2026-09-18): every frame and
   // every decoded scope packet leaves one event-log line. The 1-byte
   // "empty mailbox" poll receipts (0x0a NO_MORE_MSGS) are filtered -
@@ -52,6 +55,10 @@ const client = new MeshClient({
       routeUpdateFlash = packet.routeId;
     }
     state.apply(packet);
+    // STARTUP VIEW (Brett 2026-09-23): remember the map frame, so a
+    // fresh page shows the last-known view at once instead of an
+    // empty "waiting for LAYOUT" card.
+    if (packet.kind === "layout") saveMapFrame(packet);
     render();
   },
   onLog: (line: string) => logLine(line),
@@ -85,6 +92,20 @@ function modeLabel(mode: "radio" | "direct"): string {
   return mode === "direct" ? "Connect node" : "Connect radio";
 }
 
+// AUTO MAP REFRESH (Brett 2026-09-23, part 2 of the size plan): a
+// FRESH view asks the host for a map at the stored size the moment
+// the link is up - the same ask the Map refresh button makes, so it
+// spends one slot from the size's own allowance pool. A link bounce
+// (reconnect while the view is already drawn) must NOT re-ask: the
+// map is current and the pool is small. After a node restart the
+// view is cleared by resetAll, so the next connect re-asks honestly.
+function maybeAutoRefresh(): void {
+  if (state.geometry != null || state.health.lastPulseTs != null) return;
+  logLine("fresh view - asking the host for a " + mapSizeKm() +
+    " km map refresh");
+  sendRefresh(REFRESH_KIND_SECTION, REFRESH_WHOLE_AREA);
+}
+
 const direct = new DirectClient({
   onState: (s: DirectState, detail?: string) => {
     const chip = el<HTMLSpanElement>("conn-state");
@@ -96,6 +117,7 @@ const direct = new DirectClient({
     // type. They return the moment the link drops (any non-connected
     // state), so a failed connect can be edited immediately.
     el<HTMLDivElement>("node-link-row").hidden = s === "connected";
+    if (s === "connected") maybeAutoRefresh();
   },
   onPacket: (packet, meta) => {
     logLine(tagSource(
@@ -108,6 +130,7 @@ const direct = new DirectClient({
       routeUpdateFlash = packet.routeId;
     }
     state.apply(packet);
+    if (packet.kind === "layout") saveMapFrame(packet);
     render();
   },
   onReset: () => {
@@ -245,6 +268,55 @@ export function setMapSizeKm(km: number): void {
   }
 }
 
+// STARTUP VIEW (Brett 2026-09-23, part 1 of the size plan): the last
+// map frame is remembered so reopening the page draws THAT view at
+// once - the saved size's frame, never a stale odd one. Everything
+// read back is validated; anything odd means "no saved view".
+interface MapFrame { grid: number; centerLat: number; centerLon: number;
+  spanM: number; name: string; savedTs: number }
+
+function saveMapFrame(l: { grid: number; centerLat: number;
+  centerLon: number; spanM: number; name?: string }): void {
+  if (l.grid !== 3 && l.grid !== 4 && l.grid !== 5) return;
+  if (!(l.spanM >= 1000) || !Number.isFinite(l.centerLat) ||
+      !Number.isFinite(l.centerLon)) return;
+  try {
+    localStorage.setItem("scope.mapFrame", JSON.stringify({
+      grid: l.grid, centerLat: l.centerLat, centerLon: l.centerLon,
+      spanM: l.spanM, name: l.name || "Area", savedTs: Date.now(),
+    }));
+  } catch { /* storage denied - the view just is not remembered */ }
+}
+
+function savedMapFrame(): MapFrame | null {
+  try {
+    const raw = localStorage.getItem("scope.mapFrame");
+    if (!raw) return null;
+    const f = JSON.parse(raw) as MapFrame;
+    if ((f.grid !== 3 && f.grid !== 4 && f.grid !== 5) ||
+        !(f.spanM >= 1000) || !Number.isFinite(f.centerLat) ||
+        !Number.isFinite(f.centerLon)) return null;
+    return f;
+  } catch {
+    return null;   // storage denied or corrupt JSON: no saved view
+  }
+}
+
+/** The geometry drawn before real data arrives: the SAVED frame, with
+ * the section counter filled from the saved frame's own pulse counts.
+ * Reads as "saved view" until the live host's LAYOUT replaces it. */
+function savedFallbackGeometry(): { geo: GridGeometry;
+  counts: (number | null)[] } | null {
+  const f = savedMapFrame();
+  if (!f) return null;
+  const geo = new GridGeometry(f.grid, f.centerLat, f.centerLon, f.spanM);
+  const counts: (number | null)[] = [];
+  for (let i = 1; i <= geo.sectionCount; i++) {
+    counts.push(state.health.sectionCounts?.[i - 1] ?? null);
+  }
+  return { geo, counts };
+}
+
 /**
  * This client's stable 2-byte id (persisted per install).
  *
@@ -350,8 +422,41 @@ function renderMap(): string {
   // Map refresh lives ON the map card now (Brett 2026-09-22): a small
   // button pinned top-right of the card title row. Same handler as
   // before (wired by id in boot()); only its home moved.
+  // STARTUP VIEW: no live LAYOUT yet -> draw the saved frame when we
+  // have one ("saved view" until the host's own LAYOUT lands); the
+  // old waiting card only appears with nothing saved at all.
   const refreshBtn = `<button id="refresh-map" class="maprefresh">Map refresh</button>`;
   if (!state.geometry) {
+    const saved = savedFallbackGeometry();
+    if (saved) {
+      const nodes = [...state.nodes.values()];
+      return `<div class="card"><h3>${esc(savedMapFrame()?.name || "Area")}
+        <span class="muted">(saved view: ${saved.geo.grid}x${saved.geo.grid},
+        ~${Math.round(saved.geo.spanM / 1000)} km across)</span>${refreshBtn}</h3>
+        <div class="filters">
+          <label class="filter">Map size
+            <select id="map-size">
+              <option value="20"${mapSizeKm() === 20 ? " selected" : ""}>20 km (3/hour)</option>
+              <option value="40"${mapSizeKm() === 40 ? " selected" : ""}>40 km (2/hour)</option>
+              <option value="60"${mapSizeKm() === 60 ? " selected" : ""}>60 km (1/hour)</option>
+            </select></label>
+          <label class="filter"><input type="checkbox" id="filter-repeaters"
+          ${repeatersOnly ? "checked" : ""}/> Repeaters only</label>
+        <label class="filter"><input type="checkbox" id="show-section-numbers"
+          ${showSectionNumbers ? "checked" : ""}/> Section numbers</label>
+        ${areaMapSvg({
+          grid: saved.geo.grid,
+          west: saved.geo.west,
+          south: saved.geo.south,
+          spanDeg: saved.geo.spanDeg,
+          counts: saved.counts,
+          nodes,
+          showSectionNumbers,
+        })}
+        <p class="muted">Saved view from last time. Connect to fill it
+        with live data (a fresh connect asks the host for your map
+        size automatically).</p></div>`;
+    }
     return `<div class="card"><h3>Map ${refreshBtn}</h3>
       <p class="muted">Waiting for the area LAYOUT packet from the host
       (broadcast hourly, and at host start)...</p></div>`;
@@ -378,12 +483,12 @@ function renderMap(): string {
     <span class="muted">(${state.geometry.grid}x${state.geometry.grid},
     ~${Math.round(state.geometry.spanM / 1000)} km across)</span>${refreshBtn}</h3>
     <div class="filters">
-      <label class="filter">Map size
-        <select id="map-size">
-          <option value="20"${mapSizeKm() === 20 ? " selected" : ""}>20 km (3/hour)</option>
-          <option value="40"${mapSizeKm() === 40 ? " selected" : ""}>40 km (2/hour)</option>
-          <option value="60"${mapSizeKm() === 60 ? " selected" : ""}>60 km (1/hour)</option>
-        </select></label>
+    <label class="filter">Map size
+      <select id="map-size">
+        <option value="20"${mapSizeKm() === 20 ? " selected" : ""}>20 km (3/hour)</option>
+        <option value="40"${mapSizeKm() === 40 ? " selected" : ""}>40 km (2/hour)</option>
+        <option value="60"${mapSizeKm() === 60 ? " selected" : ""}>60 km (1/hour)</option>
+      </select></label>
       <label class="filter"><input type="checkbox" id="filter-repeaters"
       ${repeatersOnly ? "checked" : ""}/> Repeaters only</label>
     <label class="filter"><input type="checkbox" id="show-section-numbers"

@@ -53,7 +53,8 @@ def run_tests(runtime: Path) -> None:
     node-compat shim accepts node flags; true deno needs `run -A`.
     """
     tests = ("src/lib/codec.test.ts", "src/lib/trailfx.test.ts",
-             "src/lib/areamap.test.ts", "src/lib/routes.test.ts")
+             "src/lib/areamap.test.ts", "src/lib/routes.test.ts",
+             "src/lib/state.test.ts")
     if runtime.name.startswith("deno"):
         base = [str(runtime), "run", "-A"]
     else:
