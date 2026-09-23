@@ -12,18 +12,28 @@
      bottom, and screens are recessed INSET like cockpit displays.
      v2: taller plates - wider bevels and a deeper drop so cards
      visibly float off the background (Brett: "farther from the
-     background"). */
-  --panel-hi: rgba(255, 255, 255, 0.14);   /* top edge catchlight */
-  --panel-lo: rgba(0, 0, 0, 0.7);          /* bottom edge shade   */
-  --panel-edge: rgba(126, 156, 196, 0.38); /* cool metal rim      */
-  --panel-drop: 0 16px 40px rgba(0, 0, 0, 0.65), 0 4px 10px rgba(0, 0, 0, 0.5);
-  --panel-grad: linear-gradient(180deg, #1c2534 0%, #121822 100%);
-  --screen-bg: #070a10;                    /* recessed displays   */
-  --screen-inset: inset 0 2px 8px rgba(0, 0, 0, 0.75),
-    inset 0 0 0 1px rgba(0, 0, 0, 0.5);
+     background").
+     v3 (Brett 2026-09-22, "everything is very dark"): phone-day
+     brightness pass - panels lift two notches, text and muted text
+     lift one. The cockpit keeps its look; the labels get readable
+     in daylight. */
+  --panel-hi: rgba(255, 255, 255, 0.18);   /* top edge catchlight */
+  --panel-lo: rgba(0, 0, 0, 0.55);         /* bottom edge shade   */
+  --panel-edge: rgba(140, 172, 214, 0.5);  /* cool metal rim      */
+  --panel-drop: 0 16px 40px rgba(0, 0, 0, 0.5), 0 4px 10px rgba(0, 0, 0, 0.38);
+  --panel-grad: linear-gradient(180deg, #2c394e 0%, #1f2937 100%);
+  --screen-bg: #131a26;                    /* recessed displays   */
+  --screen-inset: inset 0 2px 8px rgba(0, 0, 0, 0.55),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.35);
   /* v2 (Brett): outer glow on screens is smaller and harder - a thin
      rim light, not a soft bloom. */
   --glow-accent: 0 0 3px rgba(77, 163, 255, 0.35);
+
+  /* v3 text lift: bright text goes pure-ish white, muted text gets
+     two steps up the gray ramp (was #8b98a8 on #121822 - 4.4:1;
+     now 6.2:1 on the lighter plate). */
+  --text: #f4f7fb;
+  --muted: #b6c2d2;
 }
 
 * { box-sizing: border-box; }
