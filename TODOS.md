@@ -5,14 +5,23 @@ note at the bottom when finished.
 
 ## In progress
 
-- (none - session closed for the night 2026-09-22 ~01:00, Brett's
-  order; v00.000.001 pushed)
+- STAGE 1 polish session (2026-09-22 afternoon/evening): BLE/TCP
+  labels, one-line header (disconnected + Connect + radio-name),
+  halved connection select (same right edge), right-edge alignment,
+  collapsible Feed health (title + carat), brightness pass (panels,
+  text, map corner numbers, section ID numbers). ALL COMMITTED on
+  main + synced to web/android/apple/tools. NOT PUSHED.
+- Bench server for phone testing: python http.server on port 8620,
+  serving app/dist, bound 0.0.0.0 (http://192.168.12.200:8620/).
+  PID 6352. HTTPS still needed for full Android install prompt.
 
 ## Next up (awaiting Brett's pick)
 
-- STAGE 1 BUILD: phone-ready web app - responsive layout, PNG icons
-  (192/512), service-worker registration, manifest fixes. Feeds the
-  interim Android install feel AND the future TWA. No server changes.
+- PUSH v00.000.002: everything above, needs Brett's word.
+- HTTPS bench server: self-signed cert so the phone can complete the
+  Android install (install prompt is held back on plain HTTP).
+- STAGE 1 CLOSE-OUT: phone feel confirmed by Brett (looks good
+  "for now" 2026-09-22 evening).
 
 ## Parked / future (do not start without Brett)
 
@@ -34,6 +43,10 @@ note at the bottom when finished.
 
 ## Archive (done, kept briefly for context)
 
+- 2026-09-22 (evening): STAGE 1 BUILD complete - responsive layout,
+  PNG icons 192/512 + maskable, service-worker registration (with
+  update-on-load, the Ctrl+F5 wedge fix), manifest fixes. Phone
+  layout iterated with Brett live over the bench server.
 - 2026-09-22: repo created (seeded from scope-app, docs, sync script).
 - 2026-09-22: BRANCH LAYOUT built per Brett: main = shared app/ source
   + docs; web/android/apple/tools branches add only their
