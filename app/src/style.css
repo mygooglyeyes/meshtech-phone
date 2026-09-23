@@ -154,15 +154,18 @@ svg.areamap .cover {
 svg.areamap .gridline { stroke: #39434f; }
 svg.areamap .heat { fill: var(--accent); }
 svg.areamap .ghost {
-  /* Faint fill + hard outline = the ghost watermark. NO paint-server
+  /* The SECTION ID number, big in each cell's center (Brett
+     2026-09-22: these are what he meant by "section numbers too
+     dim" - lifted from near-invisible 0.2 to clearly readable while
+     still sitting behind the corner counts and dots). NO paint-server
      gradients here: shared url(#id) fills mis-rendered as a solid
      gray block on some engines (2026-09-18). */
   fill: rgba(139, 152, 168, 0.06);
-  stroke: #8b98a8;
+  stroke: #c3cedd;
   font-weight: 700;
   font-family: inherit;
   pointer-events: none;
-  opacity: 0.2;
+  opacity: 0.55;
 }
 svg.areamap .cell { fill: transparent; cursor: pointer; }
 svg.areamap .cell:hover { fill: rgba(77, 163, 255, 0.08); }
