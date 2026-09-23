@@ -85,6 +85,26 @@ main { padding: 12px 16px 80px; max-width: 720px; margin: 0 auto; }
 
 .card h3 { margin: 0 0 10px; font-size: 16px; }
 
+/* Collapsible card (Feed health, 2026-09-22): the whole title row is
+   the tap target; a folded card hides everything below the title.
+   Same width always - only height changes. */
+.card.collapsible .fhtoggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0 0 10px;
+  padding: 2px 0;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.card.collapsible .fhtoggle .chev {
+  font-size: 14px;
+  color: var(--muted);
+  font-weight: 400;
+}
+.card.collapsible.collapsed > :not(.fhtoggle) { display: none; }
+.card.collapsible.collapsed .fhtoggle { margin-bottom: 0; }
+
 .muted { color: var(--muted); font-size: 13px; }
 
 .statgrid {
