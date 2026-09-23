@@ -194,11 +194,28 @@ export class ScopeState {
   }
 
   private applyIntro(i: Intro): string {
+    // THE 2026-09-22 ZERO-DOTS BUG, fixed here: an INTRO's positions
+    // ride the wire as DELTAS from the host's LAYOUT center (airtime
+    // economy - 4 bytes per node instead of 8). decodeIntro() decodes
+    // against the LAYOUT the client already holds. The old live path
+    // decoded against center (0,0): every positioned dot landed
+    // ~10,000 km off-map (near lat 0) - stats filled, map never drew.
+    // The demo masked it by hand-feeding true coordinates.
+    const geo = this.geometry;
     for (const e of i.entries) {
       const existing = this.nodes.get(e.prefix) || { prefix: e.prefix };
       existing.name = e.name ?? existing.name;
-      existing.lat = e.lat ?? existing.lat;
-      existing.lon = e.lon ?? existing.lon;
+      let lat = e.lat;
+      let lon = e.lon;
+      if (lat != null && lon != null && geo != null &&
+          !i.centerLat && !i.centerLon) {
+        // Decoded WITHOUT the layout center (center 0): the decode is
+        // linear, so true = decoded + center. Exact, lossless.
+        lat += geo.centerLat;
+        lon += geo.centerLon;
+      }
+      existing.lat = lat ?? existing.lat;
+      existing.lon = lon ?? existing.lon;
       // class: only overwrite when the packet carries a real one
       if ((e.nodeClass ?? 0) !== 0) existing.nodeClass = e.nodeClass;
       existing.lastIntroTs = Date.now();

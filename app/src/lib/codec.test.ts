@@ -103,6 +103,32 @@ test("intro roundtrip with positions", () => {
   assert.strictEqual(out.entries[1].lat, null);
 });
 
+// THE ZERO-DOTS REGRESSION (2026-09-22): the LIVE path decodes INTRO
+// without center opts (center 0,0) and the state re-projects by adding
+// the LAYOUT center back. The decode must be LINEAR so that
+// reconstruction is exact: decoded_no_center + center === decoded_with_center.
+test("intro decode without center is linear - layout-center re-projection is exact (zero-dots regression)", () => {
+  const centerLat = 38.1074, centerLon = -122.5697, spanM = 40000.0;
+  const raw = encodeIntro({ seq: 1, centerLat, centerLon, spanM,
+    entries: [
+      { prefix: 0x3e, name: "Novato Oakview", lat: 38.09191, lon: -122.566098 },
+      { prefix: 0x0b, name: "Hamilton DR", lat: 38.07183, lon: -122.5379 },
+    ] });
+  const body = raw.subarray(3);
+  const withCenter = decodeIntro(body, { centerLat, centerLon, spanM });
+  const noCenter = decodeIntro(body);          // the live path (center 0)
+  for (let i = 0; i < withCenter.entries.length; i++) {
+    const w = withCenter.entries[i], n = noCenter.entries[i];
+    if (w.lat == null) { assert.strictEqual(n.lat, null); continue; }
+    assert.ok(Math.abs((n.lat! + centerLat) - w.lat!) < 1e-9,
+      `lat re-projection off: ${n.lat} + ${centerLat} != ${w.lat}`);
+    assert.ok(Math.abs((n.lon! + centerLon) - w.lon!) < 1e-9,
+      `lon re-projection off: ${n.lon} + ${centerLon} != ${w.lon}`);
+    // and the re-projected value lands in Novato, not the ocean
+    assert.ok(Math.abs(n.lat! + centerLat - 38.09) < 0.03);
+  }
+});
+
 test("layout roundtrip", () => {
   const raw = encodeLayout({ seq: 3, grid: 3, centerLat: 37.4419,
     centerLon: -122.143, spanM: 40000, name: "Test area" });
