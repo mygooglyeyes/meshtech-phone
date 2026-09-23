@@ -406,7 +406,10 @@ svg.trail .hoplabel {
      row 1. Measured: 88 + 130 + 124 + 2 gaps = 358 <= 366 avail. */
   #conn-state { order: 4; }
   #connect { order: 5; margin-right: 0; } /* gap alone; the desktop margin double-counted and broke the exact-fit line */
-  #radio-name { order: 6; flex: 0 1 124px; min-width: 0; }
+  /* margin-left:auto pins radio-name's RIGHT edge to the header's
+     right padding edge - the same edge the connection select sits on
+     (Brett 2026-09-22: line up on the right, MOVE not resize). */
+  #radio-name { order: 6; flex: 0 1 124px; min-width: 0; margin-left: auto; }
   /* Title refuses to shrink (nowrap) + a 200px floor keeps row 1
      overfull even with the select halved to 75px (2026-09-22,
      Brett: half length, SAME right edge, nothing repositions) - the
