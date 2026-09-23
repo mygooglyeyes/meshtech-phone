@@ -5,12 +5,16 @@ note at the bottom when finished.
 
 ## In progress
 
-- STAGE 1 polish session (2026-09-22 afternoon/evening): BLE/TCP
-  labels, one-line header (disconnected + Connect + radio-name),
-  halved connection select (same right edge), right-edge alignment,
-  collapsible Feed health (title + carat), brightness pass (panels,
-  text, map corner numbers, section ID numbers). ALL COMMITTED on
-  main + synced to web/android/apple/tools. NOT PUSHED.
+- (none - v00.000.003 pushed 2026-09-22 late night; tree clean)
+
+## Session log (recent, for context)
+
+- v00.000.003 (pushed): THE ZERO-DOTS FIX (live INTRO positions
+  re-projected against the LAYOUT center; delta decode against 0,0
+  put every dot 10,000 km off-map - Brett verified 7 dots live),
+  Map refresh pill pinned top-right of the map card (wiring moves
+  with the card re-render), host/password row hides while connected
+  and returns the instant the link drops.
 - Bench server for phone testing: python http.server on port 8620,
   serving app/dist, bound 0.0.0.0 (http://192.168.12.200:8620/).
   PID 6352. HTTPS still needed for full Android install prompt.
