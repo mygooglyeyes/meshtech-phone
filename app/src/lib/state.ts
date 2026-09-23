@@ -209,10 +209,17 @@ export class ScopeState {
       let lon = e.lon;
       if (lat != null && lon != null && geo != null &&
           !i.centerLat && !i.centerLon) {
-        // Decoded WITHOUT the layout center (center 0): the decode is
-        // linear, so true = decoded + center. Exact, lossless.
-        lat += geo.centerLat;
-        lon += geo.centerLon;
+        // THE 60 KM PROJECTION BUG (2026-09-23, Brett's offset-twin
+        // dots): the wire carries NO span, so decodeIntro's live path
+        // assumed the old 40 km map - on the 60 km home box every dot
+        // landed at 2/3 of its true offset from center (and a sized
+        // window's INTRO decoded at 2x). The fix mirrors the zero-dots
+        // one: the LAYOUT the client holds is the truth, so rescale
+        // the decoded offset by the layout's real span BEFORE adding
+        // the center. At 40 km the factor is 1 - the exact old path.
+        const factor = geo.spanM / 40000.0;
+        lat = lat * factor + geo.centerLat;
+        lon = lon * factor + geo.centerLon;
       }
       existing.lat = lat ?? existing.lat;
       existing.lon = lon ?? existing.lon;
