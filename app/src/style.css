@@ -407,11 +407,13 @@ svg.trail .hoplabel {
   #conn-state { order: 4; }
   #connect { order: 5; margin-right: 0; } /* gap alone; the desktop margin double-counted and broke the exact-fit line */
   #radio-name { order: 6; flex: 0 1 124px; min-width: 0; }
-  /* Title refuses to shrink (nowrap) and the select stays 150px:
-     together they exceed the row once the pill tries to join, so the
-     pill ALWAYS lands on the Connect+radio-name line. */
-  header h1 { white-space: nowrap; flex-shrink: 0; }
-  #source-mode { flex: 0 0 150px; }
+  /* Title refuses to shrink (nowrap) + a 200px floor keeps row 1
+     overfull even with the select halved to 75px (2026-09-22,
+     Brett: half length, SAME right edge, nothing repositions) - the
+     title absorbs the freed 75px, so the select's right edge stays
+     pinned and the pill ALWAYS lands on the Connect+radio-name line. */
+  header h1 { white-space: nowrap; flex-shrink: 0; min-width: 200px; }
+  #source-mode { flex: 0 0 75px; }
 
   main { padding: 10px 10px 72px; }
   .card { padding: 12px; border-radius: 14px; margin-bottom: 12px; }
