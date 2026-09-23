@@ -9,3 +9,5 @@ android/*.jks
 android/build-output/
 *.log
 .DS_Store
+serve.log
+serve.err
