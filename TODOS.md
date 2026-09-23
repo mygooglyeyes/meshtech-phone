@@ -17,11 +17,15 @@ note at the bottom when finished.
 
 ## Next up (awaiting Brett's pick)
 
-- PUSH v00.000.002: everything above, needs Brett's word.
+- POSITION AUDIT (Brett, 2026-09-22 night, TOP PRIORITY): two
+  repeaters NEAR HIM advert location, yet the server shows ZERO nodes
+  with a position. Something in the advert-decode -> node-store ->
+  feed path is dropping or never receiving positions. Find where the
+  location data dies - packet capture, decode, storage, or feed.
 - HTTPS bench server: self-signed cert so the phone can complete the
   Android install (install prompt is held back on plain HTTP).
 - STAGE 1 CLOSE-OUT: phone feel confirmed by Brett (looks good
-  "for now" 2026-09-22 evening).
+  "for now" 2026-09-22 evening); v00.000.002 pushed.
 
 ## Parked / future (do not start without Brett)
 
