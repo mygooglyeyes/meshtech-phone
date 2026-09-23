@@ -95,6 +95,27 @@ main { padding: 12px 16px 80px; max-width: 720px; margin: 0 auto; }
 
 .card h3 { margin: 0 0 10px; font-size: 16px; }
 
+/* Map refresh button (Brett 2026-09-22): pinned to the top-right of
+   the map card. The h3 becomes the positioning context; the button is
+   a compact pill, out of the title's flow. */
+.card h3 { position: relative; }
+.card h3 .maprefresh {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  font: inherit;
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--panel-edge);
+  background: var(--screen-bg);
+  color: var(--text);
+  cursor: pointer;
+  box-shadow: var(--screen-inset);
+}
+.card h3 .maprefresh:hover { border-color: var(--accent); }
+
 /* Collapsible card (Feed health, 2026-09-22): the whole title row is
    the tap target; a folded card hides everything below the title.
    Same width always - only height changes. */
@@ -459,6 +480,8 @@ svg.trail .hoplabel {
      pinned and the pill ALWAYS lands on the Connect+radio-name line. */
   header h1 { white-space: nowrap; flex-shrink: 0; min-width: 200px; }
   #source-mode { flex: 0 0 75px; }
+  /* Map refresh pill on phones: same top-right pin, thumb-sized. */
+  .card h3 .maprefresh { min-height: 32px; }
 
   main { padding: 10px 10px 72px; }
   .card { padding: 12px; border-radius: 14px; margin-bottom: 12px; }
