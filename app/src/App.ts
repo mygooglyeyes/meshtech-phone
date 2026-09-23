@@ -379,7 +379,7 @@ function renderFeedHealth(): string {
   // THIS map; counting it made the stat claim dots that aren't there).
   // Derived live, never waiting on a server stat.
   const mapped = state.geometry
-    ? state.positionedNodes().filter((n) =>
+    ? state.dotNodes().filter((n) =>   // one dot per name (map = counts)
         n.lat! >= state.geometry!.south && n.lat! <= state.geometry!.north &&
         n.lon! >= state.geometry!.west && n.lon! <= state.geometry!.east
       ).length
@@ -429,7 +429,7 @@ function renderMap(): string {
   if (!state.geometry) {
     const saved = savedFallbackGeometry();
     if (saved) {
-      const nodes = [...state.nodes.values()];
+      const nodes = state.dotNodes();   // one dot per name (map = counts)
       return `<div class="card"><h3>${esc(savedMapFrame()?.name || "Area")}
         <span class="muted">(saved view: ${saved.geo.grid}x${saved.geo.grid},
         ~${Math.round(saved.geo.spanM / 1000)} km across)</span>${refreshBtn}</h3>
@@ -499,7 +499,7 @@ function renderMap(): string {
       south: state.geometry.south,
       spanDeg: state.geometry.spanDeg,
       counts,
-      nodes: [...state.nodes.values()],
+      nodes: state.dotNodes(),   // one dot per name (map = counts)
       showSectionNumbers,
     })}
     ${repeatersOnlyNote}
@@ -537,7 +537,7 @@ function renderSectionDetail(id: number): string {
       squareWest: state.geometry.west,
       squareSouth: state.geometry.south,
       squareSpan: state.geometry.spanDeg,
-      nodes: [...state.nodes.values()],
+      nodes: state.dotNodes(),   // one dot per name (map = counts)
       hoverRoutes: stubs
         .map((rid) => state.routes.get(rid))
         .filter((rt): rt is NonNullable<typeof rt> => !!rt)
