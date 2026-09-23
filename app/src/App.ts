@@ -191,11 +191,13 @@ function directUrl(): string {
 
 function sendRefresh(kind: number, target: number): void {
   const nonce = Math.floor(Math.random() * 0xffff) + 1;
-  // v1.1: origin identifies this client to the hosts' rate limiters;
-  // host=0 means "owner decides" (the multi-host election rule).
+  // v1.3 (MAP-SIZE-DESIGN): a whole-map ask carries the user's window
+  // size (20/40/60 km). Section asks keep the size too (the trimmed
+  // intro batch uses it). 0 = host decides (the whole home box).
+  const spanKm = target === REFRESH_WHOLE_AREA ? mapSizeKm() : 0;
   const payload = encodeRefreshReq({
     seq: nonce, origin: clientOrigin(), refreshKind: kind, target,
-    host: REFRESH_HOST_ANY, nonce,
+    host: REFRESH_HOST_ANY, nonce, spanKm,
   });
   if (sourceMode === "direct") {
     // Over the wire: the node dispatches a real RefreshReq through the
@@ -206,15 +208,41 @@ function sendRefresh(kind: number, target: number): void {
     const kindName = kind === REFRESH_KIND_ROUTE
       ? (target === REFRESH_WHOLE_AREA ? "map" : "route")
       : (target === REFRESH_WHOLE_AREA ? "map" : "section");
-    direct.sendRefresh(payload, reqId, kindName, target, clientOrigin());
+    direct.sendRefresh(payload, reqId, kindName, target, clientOrigin(),
+                       spanKm);
     return;
   }
   client.send(payload).then((ok) => {
     // client.send() already logs the precise reason (not connected /
     // no #scope slot / TX error) - don't overwrite it with a guess.
     if (!ok) logLine("refresh request NOT sent - see reason above");
-    else logLine(`refresh request sent (kind=${kind} target=${target})`);
+    else logLine(`refresh request sent (kind=${kind} target=${target}` +
+                 (spanKm ? `, ${spanKm} km window)` : ")"));
   });
+}
+
+/** The user's chosen map window (MAP-SIZE-DESIGN section 3): a PHONE
+ * setting, remembered like the password. 20/40/60; anything else
+ * (including storage failures) falls back to the 40 km standard. */
+export function mapSizeKm(): number {
+  const KEY = "scope.mapSizeKm";
+  let v = NaN;
+  try {
+    const raw = localStorage.getItem(KEY);
+    if (raw !== null) v = Number(raw);
+  } catch {
+    v = NaN; // storage denied - default this session
+  }
+  return v === 20 || v === 40 || v === 60 ? v : 40;
+}
+
+export function setMapSizeKm(km: number): void {
+  if (km !== 20 && km !== 40 && km !== 60) return;
+  try {
+    localStorage.setItem("scope.mapSizeKm", String(km));
+  } catch {
+    // storage denied - session-local choice, harmless
+  }
 }
 
 /**
@@ -341,7 +369,14 @@ function renderMap(): string {
   return `<div class="card"><h3>${esc(state.layout?.name || "Area")}
     <span class="muted">(${state.geometry.grid}x${state.geometry.grid},
     ~${Math.round(state.geometry.spanM / 1000)} km across)</span>${refreshBtn}</h3>
-    <label class="filter"><input type="checkbox" id="filter-repeaters"
+    <div class="filters">
+      <label class="filter">Map size
+        <select id="map-size">
+          <option value="20"${mapSizeKm() === 20 ? " selected" : ""}>20 km (3/hour)</option>
+          <option value="40"${mapSizeKm() === 40 ? " selected" : ""}>40 km (2/hour)</option>
+          <option value="60"${mapSizeKm() === 60 ? " selected" : ""}>60 km (1/hour)</option>
+        </select></label>
+      <label class="filter"><input type="checkbox" id="filter-repeaters"
       ${repeatersOnly ? "checked" : ""}/> Repeaters only</label>
     <label class="filter"><input type="checkbox" id="show-section-numbers"
       ${showSectionNumbers ? "checked" : ""}/> Section numbers</label>
@@ -583,6 +618,14 @@ function render(): void {
   // absent on the section-detail view).
   inner.querySelector("button#refresh-map")?.addEventListener("click", () => {
     sendRefresh(REFRESH_KIND_SECTION, REFRESH_WHOLE_AREA);
+  });
+  // Map size selector (v1.3): the user's window choice. Re-render the
+  // card so the header text shows the picked size immediately.
+  inner.querySelectorAll("select#map-size").forEach((el) => {
+    (el as HTMLSelectElement).addEventListener("change", (ev) => {
+      setMapSizeKm(Number((ev.target as HTMLSelectElement).value));
+      render();
+    });
   });
   // Route-row hover -> reveal that route's ghost path on the map
   // (same as the demo bench; a no-op on touch screens).

@@ -205,9 +205,11 @@ export class DirectClient {
 
   private lastUrl: string | null = null;
 
-  /** Refresh request over the wire - SAME codec bytes as radio mode. */
+  /** Refresh request over the wire - SAME codec bytes as radio mode.
+   *  spanKm (v1.3): the client's wanted window (0 = host decides) -
+   *  the node pools the global map budget PER SIZE from this value. */
   sendRefresh(payload: Uint8Array, reqId: string, kind: string,
-              target: number, origin: number): void {
+              target: number, origin: number, spanKm = 0): void {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
       this.log("not connected - refresh NOT sent");
       return;
@@ -218,10 +220,12 @@ export class DirectClient {
       kind,
       target,
       origin,
+      span_km: spanKm,
       wire: Array.from(payload).map((b) =>
         b.toString(16).padStart(2, "0")).join(""),
     });
-    this.log(`direct refresh sent (kind=${kind} target=${target})`);
+    this.log(`direct refresh sent (kind=${kind} target=${target}` +
+             (spanKm ? `, ${spanKm} km window)` : ")"));
   }
 
   /** True when the node restarted (hello last_seq < our lastSeq). */
