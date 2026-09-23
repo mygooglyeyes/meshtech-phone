@@ -32,8 +32,8 @@
   /* v3 text lift: bright text goes pure-ish white, muted text gets
      two steps up the gray ramp (was #8b98a8 on #121822 - 4.4:1;
      now 6.2:1 on the lighter plate). */
-  --text: #f4f7fb;
-  --muted: #b6c2d2;
+  --text: #ffffff;
+  --muted: #cbd6e4;
 }
 
 * { box-sizing: border-box; }
@@ -167,9 +167,13 @@ svg.areamap .ghost {
 svg.areamap .cell { fill: transparent; cursor: pointer; }
 svg.areamap .cell:hover { fill: rgba(77, 163, 255, 0.08); }
 svg.areamap .cellcount {
-  fill: #6b7889;
+  /* Corner counts (Brett 2026-09-22 "numbers need to be brighter"):
+     was #6b7889 at 0.55 opacity - nearly invisible on a phone in the
+     sun. Lifted fill + full opacity; dimness is now only the small
+     size. */
+  fill: #cfd9e6;
   font-weight: 400;
-  opacity: 0.55;
+  opacity: 0.95;
   pointer-events: none;
 }
 svg.areamap .dot { stroke: #0b0e13; stroke-width: 0.001; }
