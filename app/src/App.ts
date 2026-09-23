@@ -255,10 +255,15 @@ function fmtDelay(seconds: number | null): string {
   return seconds >= 90 ? `${Math.round(seconds / 60)} min` : `${seconds}s`;
 }
 
+// Feed health COLLAPSES by default (Brett 2026-09-22): the map is
+// the main event, so the stats shrink to a title + carat row. Session
+// state (module var) so the 1-second repaint never pops it open.
+let feedHealthOpen = false;
+
 function renderFeedHealth(): string {
   const h = state.health;
   if (h.lastPulseTs == null) {
-    return `<div class="card"><h3>Feed health</h3>
+    return `<div class="card collapsible${feedHealthOpen ? "" : " collapsed"}"><h3 id="fh-toggle" class="fhtoggle">Feed health <span class="chev">${feedHealthOpen ? "▾" : "▸"}</span></h3>
       <p class="muted">No PULSE received yet. The host sends one every
       few minutes - or press Request map refresh once connected.</p></div>`;
   }
@@ -274,7 +279,7 @@ function renderFeedHealth(): string {
         n.lon! >= state.geometry!.west && n.lon! <= state.geometry!.east
       ).length
     : 0;
-  return `<div class="card"><h3>Feed health</h3>
+  return `<div class="card collapsible${feedHealthOpen ? "" : " collapsed"}"><h3 id="fh-toggle" class="fhtoggle">Feed health <span class="chev">${feedHealthOpen ? "▾" : "▸"}</span></h3>
     <div class="statgrid">
       <div><span class="big">${h.activeTotal ?? "?"}</span>active nodes</div>
       <div><span class="big">${mapped}</span>mapped nodes</div>
@@ -546,6 +551,11 @@ function render(): void {
   });
   inner.querySelector("#show-section-numbers")?.addEventListener("change", (e) => {
     showSectionNumbers = (e.target as HTMLInputElement).checked;
+    render();
+  });
+  // Collapsible Feed health: the whole title row is the tap target.
+  inner.querySelector("#fh-toggle")?.addEventListener("click", () => {
+    feedHealthOpen = !feedHealthOpen;
     render();
   });
   inner.querySelector("button#back")?.addEventListener("click", () => {
