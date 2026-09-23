@@ -14,16 +14,18 @@ import {
   encodeSnap, peekDataType,
 } from "./codec.ts";
 
-// Golden vectors - DO NOT hand-edit; regenerate with gen_golden.py.
-// v1.2 (PROTO_VERSION 0x03): version byte 03, section ids 1-based
-// (sect_sum/route vectors carry section_id 01 = the NW square).
+// Golden vectors - DO NOT hand-edit; regenerate with gen_golden.py
+// (meshtech-node repo) and copy the values here.
+// v1.3 (PROTO_VERSION 0x04, MAP-SIZE-DESIGN 2026-09-23): version byte
+// 04; the REFRESH_REQ vector is 2 bytes longer (the new span_km
+// field, value 0 = host decides).
 const GOLDEN: Record<string, string> = {
-  "pulse": "0153170313017eb1d20404000900280009090305080200010406",
-  "sect_sum": "0253130304007eb101017e003000300300022102cdab",
-  "route": "0353120302007eb101efbe38000400110003112233",
-  "layout": "0553150303007eb10344d61200a01ce9ff409c0464656d6f",
-  "intro": "04531c0302007eb10211030748696c6c746f7024002400220105416c696365",
-  "refresh": "11530c030200420002efbe7eb13412",
+  "pulse": "0153170413017eb1d20404000900280009090305080200010406",
+  "sect_sum": "0253130404007eb101017e003000300300022102cdab",
+  "route": "0353120402007eb101efbe38000400110003112233",
+  "layout": "0553150403007eb10344d61200a01ce9ff409c0464656d6f",
+  "intro": "04531c0402007eb10211030748696c6c746f7024002400220105416c696365",
+  "refresh": "11530e040200420002efbe7eb134120000",
 };
 
 function hex(bytes: Uint8Array): string {
@@ -198,7 +200,7 @@ test("intro class bits leave golden-vector bytes untouched", () => {
       { prefix: 0x22, name: "Alice" },
     ] });
   assert.strictEqual(hex(raw),
-    "04531c0302007eb10211030748696c6c746f7024002400220105416c696365");
+    "04531c0402007eb10211030748696c6c746f7024002400220105416c696365");
 });
 
 test("esc neutralises wire-string injection", () => {

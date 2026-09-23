@@ -4,13 +4,14 @@
  * TypeScript port of meshtech-scope/src/meshtech_scope/core/codec.py.
  * Both implement PROTOCOL.md exactly and must pass the SAME golden
  * vectors (see codec.test.ts and meshtech-scope/tests/golden_vectors.json).
- * Any wire change happens in PROTOCOL.md first, bumps PROTO_VERSION,
+ * Any wire change happens in PROTOCOL.md first, bumps PROTO_VERSION
+ * (v1.3, 2026-09-23, MAP-SIZE-DESIGN.md: REFRESH_REQ + span_km),
  * and regenerates the vectors on both sides.
  *
  * All multi-byte integers are little-endian (MeshCore convention).
  */
 
-export const PROTO_VERSION = 0x03;
+export const PROTO_VERSION = 0x04;
 
 // v1.2 (2026-09-20): SECTION IDS ARE 1-BASED (1 = NW .. 9 = SE, matching
 // what the UI prints). 0 is RESERVED: in a REFRESH_REQ target it means
@@ -96,7 +97,7 @@ function unpackHeader(p: Uint8Array, off: number): [Header, number] {
   }
   // STRICT like the Python codec: an unknown version must not be read
   // with guessed field widths - a loud error beats a confident misread.
-  if (version !== 0x02 && version !== 0x03)
+  if (version !== 0x02 && version !== 0x03 && version !== 0x04)
     throw new CodecError(`unsupported protocol version 0x${version.toString(16).padStart(2, "0")}`);
   if (p.length < off + 5) throw new CodecError("payload too short for v1.1 header");
   return [{ version, seq: p[off + 1] | (p[off + 2] << 8),
@@ -475,6 +476,8 @@ export function decodeSnap(body: Uint8Array): Snap {
 
 // --------------------------------------------------------------- REFRESH_REQ
 
+export const REFRESH_SPAN_HOST_DECIDES = 0; // v1.3: 0 = host decides
+
 export interface RefreshReq {
   kind: "refresh_req";
   seq: number;
@@ -483,19 +486,21 @@ export interface RefreshReq {
   target: number;
   host?: number;         // preferred origin, 0 = owner decides (v1.1)
   nonce: number;
+  spanKm?: number;       // v1.3: wanted window 20/40/60; 0 = host decides
 }
 
 export function encodeRefreshReq(r: Omit<RefreshReq, "kind">): Uint8Array {
   if (r.refreshKind !== REFRESH_KIND_SECTION && r.refreshKind !== REFRESH_KIND_ROUTE)
     throw new CodecError(`refresh kind invalid: ${r.refreshKind}`);
-  // v1.1 body: kind(1) + target(2) + host(2) + nonce(2)
-  const body = new Uint8Array(5 + 7);
+  // v1.3 body: kind(1) + target(2) + host(2) + nonce(2) + span_km(2)
+  const body = new Uint8Array(5 + 9);
   body.set(packHeader(r.seq, r.origin ?? 0), 0);
   const dv = new DataView(body.buffer);
   body[5] = r.refreshKind;
   dv.setUint16(6, u16(r.target, "target"), true);
   dv.setUint16(8, u16(r.host ?? REFRESH_HOST_ANY, "host"), true);
   dv.setUint16(10, u16(r.nonce, "nonce"), true);
+  dv.setUint16(12, u16(r.spanKm ?? REFRESH_SPAN_HOST_DECIDES, "span_km"), true);
   return dataBytes(TYPE_REFRESH_REQ, body);
 }
 
@@ -503,18 +508,29 @@ export function decodeRefreshReq(body: Uint8Array): RefreshReq {
   const [h, off0] = unpackHeader(body, 0);
   const off = off0;
   const dv = new DataView(body.buffer, body.byteOffset, body.byteLength);
+  if (h.version >= 0x04) {
+    // v1.3 body: kind(1) + target(2) + host(2) + nonce(2) + span_km(2)
+    if (body.length < off + 9) throw new CodecError("REFRESH_REQ too short");
+    return { kind: "refresh_req", seq: h.seq, origin: h.origin,
+             refreshKind: body[off], target: dv.getUint16(off + 1, true),
+             host: dv.getUint16(off + 3, true),
+             nonce: dv.getUint16(off + 5, true),
+             spanKm: dv.getUint16(off + 7, true) };
+  }
   if (h.version >= 0x02) {
     if (body.length < off + 7) throw new CodecError("REFRESH_REQ too short");
     return { kind: "refresh_req", seq: h.seq, origin: h.origin,
              refreshKind: body[off], target: dv.getUint16(off + 1, true),
              host: dv.getUint16(off + 3, true),
-             nonce: dv.getUint16(off + 5, true) };
+             nonce: dv.getUint16(off + 5, true),
+             spanKm: REFRESH_SPAN_HOST_DECIDES };
   }
   // v1 body: kind(1) + target(2) + nonce(2), no host field
   if (body.length < off + 5) throw new CodecError("REFRESH_REQ too short");
   return { kind: "refresh_req", seq: h.seq, origin: h.origin,
            refreshKind: body[off], target: dv.getUint16(off + 1, true),
-           host: REFRESH_HOST_ANY, nonce: dv.getUint16(off + 3, true) };
+           host: REFRESH_HOST_ANY, nonce: dv.getUint16(off + 3, true),
+           spanKm: REFRESH_SPAN_HOST_DECIDES };
 }
 
 // --------------------------------------------------------------- generic
