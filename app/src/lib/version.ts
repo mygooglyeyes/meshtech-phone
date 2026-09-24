@@ -4,4 +4,4 @@
  * pyproject.toml by the release process; a stale cached page shows an
  * old number next to the fresh one on the box's install summary.
  */
-export const APP_VERSION = "00.000.011";
+export const APP_VERSION = "00.000.012";

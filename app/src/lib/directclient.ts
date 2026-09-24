@@ -13,12 +13,35 @@
  * re-dials with a stale password tripped the node's anti-guessing
  * lockout (5 refusals/min), locking out even the right password; and
  * a broken link should say so, not hide behind silent retries.
+ *
+ * SILENT-DROP WATCHDOG (2026-09-24, Brett's 233-minute pulse age):
+ * the rule above only fires when the drop is ANNOUNCED (a close
+ * frame). Phone sleep kills TCP without either side noticing - no
+ * close event, chip still says "connected", and the pulse-age counter
+ * counted up from the last true pulse for hours while the server
+ * pulsed into a dead socket. Now: any LINK-DEAD span (no packet AND
+ * no pong) past WATCHDOG_TIMEOUT_MS ends the session exactly like an
+ * announced close - honest "link lost" chip, Connect is a human
+ * press. Heartbeats don't mask a starved feed: the node's cadence
+ * (a burst every few minutes, always with packets) is what this
+ * actually watches. WS frames can be sent into a half-dead socket,
+ * so the flip may take one failed write - it lands on the next tick.
  */
 
 import { decodeAny, type ScopePacket } from "./codec.ts";
 
 export type DirectState =
   | "disabled" | "connecting" | "connected" | "reconnecting";
+
+/** Silent-drop detection span: no LINK-DEAD span may last longer than
+ * this before the app itself ends the session. The node's slowest
+ * certain heartbeat is the pulse cadence (300s), so 2x plus margin
+ * (660s = 11 min) never false-positives on a healthy link. */
+export const WATCHDOG_TIMEOUT_MS = 660_000;
+
+/** How often the watchdog looks. Only ever fires long after the
+ * timeout, so a coarse 15s poll costs nothing and wakes nobody. */
+const WATCHDOG_TICK_MS = 15_000;
 
 export interface DirectClientEvents {
   onState?: (state: DirectState, detail?: string) => void;
@@ -44,8 +67,21 @@ export class DirectClient {
    * feed link may cross machines; the password gates the DATA door).
    * Sent as a subprotocol - browsers cannot set custom WS headers. */
   private token: string | null = null;
+  /** Last proof the link lives (packet OR pong), epoch ms. */
+  private lastAliveMs = 0;
+  private watchdogTimer: ReturnType<typeof setInterval> | null = null;
+  /** Legacy reconnect timer slot (kept for disconnect cleanup). */
+  private timer: ReturnType<typeof setTimeout> | null = null;
+  /** Watchdog timings (tests inject small values; prod uses the
+   * honest 11-min timeout). */
+  private readonly watchdogMs: number;
+  private readonly watchdogTickMs: number;
 
-  constructor(private readonly events: DirectClientEvents) {}
+  constructor(private readonly events: DirectClientEvents,
+              opts: { watchdogMs?: number; watchdogTickMs?: number } = {}) {
+    this.watchdogMs = opts.watchdogMs ?? WATCHDOG_TIMEOUT_MS;
+    this.watchdogTickMs = opts.watchdogTickMs ?? WATCHDOG_TICK_MS;
+  }
 
   get linkState(): DirectState {
     return this.state;
@@ -65,6 +101,7 @@ export class DirectClient {
 
   disconnect(): void {
     this.wantRun = false;
+    this.stopWatchdog();
     if (this.timer) clearTimeout(this.timer);
     this.timer = null;
     if (this.ws) {
@@ -103,6 +140,8 @@ export class DirectClient {
 
     ws.onopen = () => {
       // hello arrives as the first message; state reported there.
+      // The watchdog counts from here (0 span at open; it starts
+      // for real when "connected" is reported below).
     };
     ws.onmessage = (ev) => this.onMessage(ev.data as string);
     ws.onclose = (ev) => {
@@ -117,6 +156,7 @@ export class DirectClient {
       // NO AUTO-RECONNECT (Brett, 2026-09-23): end the session. The
       // chip shows WHY (code 1006 = the network path died; a refused
       // password lands here too), and Connect is a human press.
+      this.stopWatchdog();
       if (!this.wantRun) return;   // disconnect() already reported it
       this.wantRun = false;
       this.setState("disabled", `link closed (code ${ev.code})`);
@@ -141,6 +181,8 @@ export class DirectClient {
         `node proto ${this.proto}` +
         (this.benchNoRadio ? " - BENCH (tx impossible)" :
           this.txEnabled ? "" : " - node TX off (listen-only)"));
+      this.lastAliveMs = Date.now();
+      this.startWatchdog();
       this.log(`node hello: proto ${this.proto}, last_seq ${msg.last_seq}`);
       // Node restarted since our last view? Its seq regressed -> local
       // state is stale: drop it and let a fresh LAYOUT redraw (the
@@ -152,6 +194,7 @@ export class DirectClient {
       return;
     }
     if (type === "packet") {
+      this.lastAliveMs = Date.now();
       const seq = Number(msg.seq ?? 0);
       if (seq <= this.lastSeq) return;        // duplicate from resume
       this.lastSeq = seq;
@@ -173,7 +216,10 @@ export class DirectClient {
       });
       return;
     }
-    if (type === "pong") return; // liveness, not news
+    if (type === "pong") {
+      this.lastAliveMs = Date.now();   // liveness counts; news doesn't
+      return;
+    }
     if (type === "ack") {
       // The node's verdict on a refresh request. Honest refusal beats
       // silence: a budget-spent whole-map refresh would otherwise look
@@ -185,12 +231,17 @@ export class DirectClient {
         const wait = Number(msg.retry_after_s ?? 0);
         const why = String(msg.reason ?? "refused");
         const mins = Math.ceil(wait / 60);
+        const secs = Math.ceil(wait);
         this.log(
           why === "map_budget"
             ? `refresh refused - whole-map refresh budget spent, try again in ~${mins} min`
-            : why === "listen_only"
-              ? `refresh refused - this is a listen-only companion device; the map fills from heard packets`
-              : `refresh refused (${why})`);
+            : why === "hourly_cap"
+              ? `refresh refused - the ${mins}-min pool for this size is spent, next slot in ~${mins} min`
+              : why === "cooldown"
+                ? `refresh refused - asks are rate-limited to one per 30s, try again in ${secs}s`
+                : why === "listen_only"
+                  ? `refresh refused - this is a listen-only companion device; the map fills from heard packets`
+                  : `refresh refused (${why})`);
       }
       return;
     }
@@ -230,9 +281,37 @@ export class DirectClient {
   }
 
   private send(obj: Record<string, unknown>): void {
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+    if (this.ws && this.ws.readyState !== WebSocket.CLOSED) {
       this.ws.send(JSON.stringify(obj));
     }
+  }
+
+  // ------------------------------------------------- silent-drop watchdog
+
+  private startWatchdog(): void {
+    this.stopWatchdog();
+    this.watchdogTimer = setInterval(() => {
+      if (this.wantRun && this.state === "connected" &&
+          Date.now() - this.lastAliveMs > this.watchdogMs) {
+        // A silent drop is still a drop: no close frame will ever
+        // come. End the session exactly like an announced one.
+        // (If the TCP write fails too, onclose completes the job
+        // moments later - the states agree.)
+        this.log(
+          `link lost - no feed for ` +
+          `${Math.round(this.watchdogMs / 60000)} min (silent drop)`);
+        this.wantRun = false;
+        try { this.ws?.close(); } catch { /* already gone */ }
+        this.ws = null;
+        this.stopWatchdog();
+        this.setState("disabled", "link lost (no feed)");
+      }
+    }, this.watchdogTickMs);
+  }
+
+  private stopWatchdog(): void {
+    if (this.watchdogTimer) clearInterval(this.watchdogTimer);
+    this.watchdogTimer = null;
   }
 
   private setState(s: DirectState, detail?: string): void {
