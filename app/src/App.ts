@@ -94,17 +94,57 @@ function modeLabel(mode: "radio" | "direct"): string {
 }
 
 // AUTO MAP REFRESH (Brett 2026-09-23, part 2 of the size plan): a
-// FRESH view asks the host for a map at the stored size the moment
-// the link is up - the same ask the Map refresh button makes, so it
-// spends one slot from the size's own allowance pool. A link bounce
-// (reconnect while the view is already drawn) must NOT re-ask: the
-// map is current and the pool is small. After a node restart the
-// view is cleared by resetAll, so the next connect re-asks honestly.
+// FRESH view asks the host for a map at the stored size - the same
+// ask the Map refresh button makes, so it spends one slot from the
+// size's own allowance pool. A link bounce (reconnect while the view
+// is already drawn) must NOT re-ask: the map is current and the pool
+// is small. After a node restart the view is cleared by resetAll, so
+// the next connect re-asks honestly.
+//
+// THE 3-SECOND GRACE (2026-09-24, the eaten-60km-slot hunt): the
+// CONNECT BURST already carries LAYOUT + PULSE + the whole roster
+// (layout-then-pulse, Brett 2026-09-21), and an auto ask fired in
+// the same instant spends a WHOLE-REFRESH budget slot for data the
+// burst is about to deliver anyway - the fresh 60 km ask at
+// 02:03:27 ate the day's first slot and the manual press seconds
+// later was refused ("budget spent, ~25 min"). So the ask waits a
+// grace period and cancels itself the moment the burst delivers the
+// map (a LAYOUT or a PULSE - the feed demonstrably works).
+const AUTO_REFRESH_DELAY_MS = 3000;
+let autoRefreshTimer: ReturnType<typeof setTimeout> | null = null;
+
+function cancelAutoRefresh(): void {
+  if (autoRefreshTimer) clearTimeout(autoRefreshTimer);
+  autoRefreshTimer = null;
+}
+
+// SIZE-AWARE (the 2026-09-24 "always opens 60 km" report): the
+// connect burst carries the HOME box (hilltop = 60 km), so "a map
+// arrived" is not the same as "MY size arrived". The ask is skipped
+// only when the held map is already at the user's chosen size; a
+// 20 km user still gets their 20 km map after the burst lands.
+function mapAtChosenSize(): boolean {
+  if (state.health.lastPulseTs == null) return false;   // no live map
+  return state.geometry != null &&
+    Math.round(state.geometry.spanM / 1000) === mapSizeKm();
+}
+
 function maybeAutoRefresh(): void {
-  if (state.geometry != null || state.health.lastPulseTs != null) return;
-  logLine("fresh view - asking the host for a " + mapSizeKm() +
-    " km map refresh");
-  sendRefresh(REFRESH_KIND_SECTION, REFRESH_WHOLE_AREA);
+  cancelAutoRefresh();   // a new connect always reschedules cleanly
+  if (mapAtChosenSize()) {
+    logLine(`map already at ${mapSizeKm()} km - no auto refresh ask`);
+    return;
+  }
+  autoRefreshTimer = setTimeout(() => {
+    autoRefreshTimer = null;
+    if (mapAtChosenSize()) {
+      logLine(`connect burst delivered a ${mapSizeKm()} km map - no ask`);
+      return;
+    }
+    logLine("asking the host for a " + mapSizeKm() +
+      " km map refresh");
+    sendRefresh(REFRESH_KIND_SECTION, REFRESH_WHOLE_AREA);
+  }, AUTO_REFRESH_DELAY_MS);
 }
 
 const direct = new DirectClient({
@@ -119,6 +159,7 @@ const direct = new DirectClient({
     // state), so a failed connect can be edited immediately.
     el<HTMLDivElement>("node-link-row").hidden = s === "connected";
     if (s === "connected") maybeAutoRefresh();
+    else cancelAutoRefresh();   // a pending ask must not outlive the link
   },
   onPacket: (packet, meta) => {
     logLine(tagSource(
