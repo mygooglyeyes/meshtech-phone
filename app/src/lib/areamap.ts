@@ -115,6 +115,23 @@ export function sectionMapSvg(o: {
   </svg>`;
 }
 
+/**
+ * DOT LEGEND (Brett, 2026-09-23): tiny text + color dot above the map,
+ * naming the three node classes the dots encode. The colors come from
+ * the same CSS variables the dots themselves use (style.css .dot-*),
+ * so legend and map can never disagree.
+ */
+export function dotLegend(): string {
+  const item = (color: string, label: string): string =>
+    `<span class="dotlegend-item"><span class="dotlegend-dot" ` +
+    `style="background:${color}"></span>${label}</span>`;
+  return `<div class="dotlegend">` +
+    item("var(--good)", "repeater") +
+    item("var(--accent)", "companion") +
+    item("var(--muted)", "class unknown") +
+    `</div>`;
+}
+
 export function areaMapSvg(o: AreaMapOpts): string {
   const { grid, west, south, spanDeg: span } = o;
   const north = south + span;
