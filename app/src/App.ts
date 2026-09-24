@@ -20,7 +20,8 @@ import {
 } from "./lib/codec.ts";
 import { esc, escOr } from "./lib/esc.ts";
 import { trailFx, startTrailPulse, AGING_LABEL } from "./lib/trailfx.ts";
-import { areaMapSvg, sectionMapSvg } from "./lib/areamap.ts";
+import { areaMapSvg, sectionMapSvg, dotLegend } from "./lib/areamap.ts";
+import { APP_VERSION } from "./lib/version.ts";
 import { routeDisplayName } from "./lib/routes.ts";
 
 const state = new ScopeState();
@@ -444,6 +445,7 @@ function renderMap(): string {
           ${repeatersOnly ? "checked" : ""}/> Repeaters only</label>
         <label class="filter"><input type="checkbox" id="show-section-numbers"
           ${showSectionNumbers ? "checked" : ""}/> Section numbers</label>
+        ${dotLegend()}
         ${areaMapSvg({
           grid: saved.geo.grid,
           west: saved.geo.west,
@@ -493,6 +495,7 @@ function renderMap(): string {
       ${repeatersOnly ? "checked" : ""}/> Repeaters only</label>
     <label class="filter"><input type="checkbox" id="show-section-numbers"
       ${showSectionNumbers ? "checked" : ""}/> Section numbers</label>
+    ${dotLegend()}
     ${areaMapSvg({
       grid: state.geometry.grid,
       west: state.geometry.west,
@@ -531,7 +534,7 @@ function renderSectionDetail(id: number): string {
   let mapBlock = "";
   if (state.geometry) {
     const r = state.geometry.section(id);
-    mapBlock = sectionMapSvg({
+    mapBlock = dotLegend() + sectionMapSvg({
       sectionId: id,
       west: r.west, south: r.south, east: r.east, north: r.north,
       squareWest: state.geometry.west,
@@ -754,6 +757,9 @@ function render(): void {
 
 export function boot(): void {
   el<HTMLButtonElement>("connect").addEventListener("click", onConnect);
+  // VERSION CHIP (2026-09-23): the app version is always visible in
+  // the header - "is my page current?" stops being a guess.
+  el<HTMLSpanElement>("app-version").textContent = APP_VERSION;
   // DIRECT mode switch (bench): one source at a time, chosen here.
   el<HTMLSelectElement>("source-mode").addEventListener("change", async (e) => {
     const mode = (e.target as HTMLSelectElement).value as "radio" | "direct";
