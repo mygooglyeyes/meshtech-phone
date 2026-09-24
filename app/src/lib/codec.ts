@@ -11,7 +11,7 @@
  * All multi-byte integers are little-endian (MeshCore convention).
  */
 
-export const PROTO_VERSION = 0x04;
+export const PROTO_VERSION = 0x05;
 
 // v1.2 (2026-09-20): SECTION IDS ARE 1-BASED (1 = NW .. 9 = SE, matching
 // what the UI prints). 0 is RESERVED: in a REFRESH_REQ target it means
@@ -97,7 +97,8 @@ function unpackHeader(p: Uint8Array, off: number): [Header, number] {
   }
   // STRICT like the Python codec: an unknown version must not be read
   // with guessed field widths - a loud error beats a confident misread.
-  if (version !== 0x02 && version !== 0x03 && version !== 0x04)
+  if (version !== 0x02 && version !== 0x03 && version !== 0x04 &&
+      version !== 0x05)
     throw new CodecError(`unsupported protocol version 0x${version.toString(16).padStart(2, "0")}`);
   if (p.length < off + 5) throw new CodecError("payload too short for v1.1 header");
   return [{ version, seq: p[off + 1] | (p[off + 2] << 8),
@@ -307,6 +308,8 @@ export interface Intro {
   centerLat: number;
   centerLon: number;
   spanM: number;
+  /** v1.5: the span the packet itself carried (the decode truth). */
+  wireSpanM?: number;
 }
 
 function positionDeltas(intro: { centerLat: number; centerLon: number; spanM: number },
@@ -326,7 +329,16 @@ function positionFromDeltas(intro: { centerLat: number; centerLon: number; spanM
 
 export function encodeIntro(intro: Omit<Intro, "kind">): Uint8Array {
   if (intro.entries.length > 255) throw new CodecError("too many intro entries");
+  // v1.5: the span rides the packet (Brett's offset-dots fix) - the
+  // decoder never has to GUESS the scale the deltas were measured at.
+  const spanWire = Math.round(intro.spanM);
+  if (!Number.isInteger(spanWire) || spanWire <= 0 || spanWire > 0xffff)
+    throw new CodecError(`intro span_m out of wire range: ${intro.spanM}`);
+  const spanBytes = new Uint8Array(2);
+  spanBytes[0] = spanWire & 0xff;
+  spanBytes[1] = (spanWire >> 8) & 0xff;
   const chunks: Uint8Array[] = [packHeader(intro.seq, intro.origin ?? 0),
+                                spanBytes,
                                 Uint8Array.of(intro.entries.length)];
   for (const entry of intro.entries) {
     const nameBytes = new TextEncoder().encode((entry.name || "").slice(0, MAX_NAME));
@@ -361,9 +373,29 @@ export function decodeIntro(
 ): Intro {
   const centerLat = opts.centerLat ?? 0.0;
   const centerLon = opts.centerLon ?? 0.0;
-  const spanM = opts.spanM ?? 40000.0;
   const [h, off0] = unpackHeader(body, 0);
   let off = off0;
+  // v1.5: the packet carries its OWN span (2 LE meters) - the truth
+  // the deltas were measured at. The opts spanM (a caller's LAYOUT
+  // guess) is cross-check only: a mismatch throws, loudly, instead of
+  // scaling every dot wrong in silence (Brett's offset-dots bug).
+  // No opts = TRUST the packet. v1.0-1.4 packets carry no span field:
+  // fall back to the caller's span (or the era's 40 km assumption)
+  // for packets still in flight from a pre-v1.5 host.
+  let spanM: number;
+  let wireSpan: number | undefined;
+  if (h.version >= 0x05) {
+    if (body.length < off + 2) throw new CodecError("INTRO too short for span field");
+    wireSpan = body[off] | (body[off + 1] << 8);
+    off += 2;
+    if (wireSpan <= 0) throw new CodecError(`INTRO span must be positive, got ${wireSpan}`);
+    if (opts.spanM != null && Math.round(opts.spanM) !== wireSpan)
+      throw new CodecError(
+        `INTRO span mismatch: packet says ${wireSpan} m, caller assumed ${Math.round(opts.spanM)} m`);
+    spanM = wireSpan;
+  } else {
+    spanM = opts.spanM ?? 40000.0;
+  }
   if (body.length < off + 1) throw new CodecError("INTRO too short");
   const count = body[off]; off += 1;
   const entries: IntroEntry[] = [];
@@ -394,7 +426,7 @@ export function decodeIntro(
     entries.push({ prefix, name, lat, lon, nodeClass });
   }
   return { kind: "intro", seq: h.seq, origin: h.origin, entries,
-           centerLat, centerLon, spanM };
+           centerLat, centerLon, spanM, wireSpanM: wireSpan };
 }
 
 // --------------------------------------------------------------- LAYOUT

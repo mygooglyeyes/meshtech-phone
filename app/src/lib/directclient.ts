@@ -64,6 +64,11 @@ export class DirectClient {
   connect(url: string, token?: string): void {
     this.wantRun = true;
     this.token = token || null;
+    // THE RECONNECT DIALS THE ORIGINAL URL (2026-09-23, Brett's
+    // "retrying and not connecting"): remember it. lastUrl was never
+    // assigned - every reconnect after a drop dialed null, failed,
+    // and only a fresh page (a manual connect) ever recovered.
+    this.lastUrl = url;
     this.open(url);
   }
 
@@ -80,6 +85,13 @@ export class DirectClient {
 
   private open(url: string): void {
     if (!this.wantRun) return;
+    if (!url) {
+      // Belt and braces: a blank address must never reach the
+      // WebSocket constructor (it would silently connect somewhere
+      // else or fail forever - never the node).
+      this.scheduleReconnect("no url to dial");
+      return;
+    }
     this.setState("connecting");
     let ws: WebSocket;
     try {

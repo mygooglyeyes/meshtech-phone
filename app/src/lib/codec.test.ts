@@ -16,16 +16,16 @@ import {
 
 // Golden vectors - DO NOT hand-edit; regenerate with gen_golden.py
 // (meshtech-node repo) and copy the values here.
-// v1.3 (PROTO_VERSION 0x04, MAP-SIZE-DESIGN 2026-09-23): version byte
-// 04; the REFRESH_REQ vector is 2 bytes longer (the new span_km
-// field, value 0 = host decides).
+// v1.5 (PROTO_VERSION 0x05, 2026-09-23): version byte 05; the INTRO
+// vector is 2 bytes longer - the packet now carries its OWN span
+// (409c = 40000 m LE), so the client never guesses the delta scale.
 const GOLDEN: Record<string, string> = {
-  "pulse": "0153170413017eb1d20404000900280009090305080200010406",
-  "sect_sum": "0253130404007eb101017e003000300300022102cdab",
-  "route": "0353120402007eb101efbe38000400110003112233",
-  "layout": "0553150403007eb10344d61200a01ce9ff409c0464656d6f",
-  "intro": "04531c0402007eb10211030748696c6c746f7024002400220105416c696365",
-  "refresh": "11530e040200420002efbe7eb134120000",
+  "pulse": "0153170513017eb1d20404000900280009090305080200010406",
+  "sect_sum": "0253130504007eb101017e003000300300022102cdab",
+  "route": "0353120502007eb101efbe38000400110003112233",
+  "layout": "0553150503007eb10344d61200a01ce9ff409c0464656d6f",
+  "intro": "04531e0502007eb1409c0211030748696c6c746f7024002400220105416c696365",
+  "refresh": "11530e050200420002efbe7eb134120000",
 };
 
 function hex(bytes: Uint8Array): string {
@@ -103,6 +103,28 @@ test("intro roundtrip with positions", () => {
   assert.strictEqual(out.entries[0].name, "Hilltop");
   assert.ok(Math.abs(out.entries[0].lat! - 37.1) < 0.002);
   assert.strictEqual(out.entries[1].lat, null);
+});
+
+// THE OFFSET-DOTS REGRESSION (2026-09-23, Brett: "a new set of offset
+// node dots on every connect"): the INTRO must carry its OWN span.
+// Before v1.5 the client guessed the scale from the held LAYOUT - any
+// mismatch (sized window, replayed LAYOUT) scaled every dot wrong.
+test("intro carries its own span - the packet wins over any caller guess", () => {
+  const raw = encodeIntro({ seq: 1, centerLat: 0, centerLon: 0,
+    spanM: 60000.0,
+    entries: [{ prefix: 0x11, name: "Sixty", lat: 0.2, lon: -0.2 }] });
+  // decode with NO opts: the packet's span is used, positions true
+  const truth = decodeIntro(raw.subarray(3));
+  assert.strictEqual(truth.spanM, 60000);
+  assert.strictEqual(truth.wireSpanM, 60000);
+  assert.ok(Math.abs(truth.entries[0].lat! - 0.2) < 0.002);
+  // a caller holding the WRONG LAYOUT (40 km) gets a loud error -
+  // never a silently scaled set of offset dots
+  assert.throws(
+    () => decodeIntro(raw.subarray(3), { spanM: 40000.0 }), CodecError);
+  // the matching span still decodes (cross-check passes)
+  const agree = decodeIntro(raw.subarray(3), { spanM: 60000.0 });
+  assert.ok(Math.abs(agree.entries[0].lat! - 0.2) < 0.002);
 });
 
 // THE ZERO-DOTS REGRESSION (2026-09-22): the LIVE path decodes INTRO
@@ -200,7 +222,7 @@ test("intro class bits leave golden-vector bytes untouched", () => {
       { prefix: 0x22, name: "Alice" },
     ] });
   assert.strictEqual(hex(raw),
-    "04531c0402007eb10211030748696c6c746f7024002400220105416c696365");
+    "04531e0502007eb1409c0211030748696c6c746f7024002400220105416c696365");
 });
 
 test("esc neutralises wire-string injection", () => {
