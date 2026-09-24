@@ -1,12 +1,13 @@
 /**
- * DirectClient reconnect tests (2026-09-23, Brett's drop-retry bug).
+ * DirectClient drop tests (2026-09-23, Brett's call: NO AUTO-RECONNECT).
  *
- * THE BUG, pinned: a link drop (code 1006 - phone sleep, Wi-Fi blip)
- * schedules a reconnect that dialed this.lastUrl - which was NEVER
- * assigned. The retry dialed null forever: "retrying and not
- * connecting" until a page refresh re-ran connect() with the real
- * URL. The fix: connect() remembers the URL it was given, and open()
- * refuses to dial a blank one.
+ * THE STORY: background re-dials after a drop (a) dialed a blank URL
+ * when lastUrl was never assigned (the "retrying and not connecting"
+ * bug), then (b) even after that fix, retries with a stale password
+ * tripped the node's anti-guessing lockout (5 refusals/min) and locked
+ * out the RIGHT password. Brett's verdict: a drop ENDS the session.
+ * Pinned here: a 1006 close must NOT dial again - the state goes
+ * disabled with the reason, and only a human connect() re-dials.
  *
  * The client's WebSocket needs a browser; tests stub the global
  * WebSocket with a tiny fake that records every dial.
@@ -42,31 +43,36 @@ function dialedUrls(): string[] {
   return FakeWebSocket.instances.map((ws) => String(ws.url));
 }
 
-test("reconnect after a 1006 drop dials the ORIGINAL url (lastUrl bug)",
+test("a 1006 drop ends the session - no background re-dial (Brett)",
   async () => {
     FakeWebSocket.instances = [];
-    const client = new DirectClient({ onLog: () => {} });
+    let lastState = "";
+    let lastDetail = "";
+    const client = new DirectClient({
+      onLog: () => {},
+      onState: (s, detail) => { lastState = s; lastDetail = detail ?? ""; },
+    });
     client.connect("ws://hilltop:8710/ws");
     assert.strictEqual(dialedUrls().length, 1);
-    assert.strictEqual(dialedUrls()[0], "ws://hilltop:8710/ws");
 
     // the link dies the way Brett's log showed: code=1006, clean=false
     const link = FakeWebSocket.instances[0];
     link.onclose?.({ code: 1006, wasClean: false });
 
-    // the retry timer fires after ~1-1.5 s of backoff; the ONE thing
-    // that must be true: the second dial carries the node's URL again
-    // (before the fix it dialed null and never reconnected at all).
-    const deadline = Date.now() + 3000;
-    while (FakeWebSocket.instances.length < 2 && Date.now() < deadline) {
-      await new Promise((r) => setTimeout(r, 50));
-    }
-    assert.strictEqual(FakeWebSocket.instances.length, 2,
-      "a reconnect must have been dialed after the drop");
-    assert.strictEqual(dialedUrls()[1], "ws://hilltop:8710/ws",
-      `the retry must dial the original url, got: ${dialedUrls()[1]}`);
+    // give any (now-forbidden) retry timer a moment to misfire
+    await new Promise((r) => setTimeout(r, 300));
 
-    client.disconnect();     // stop the client's timers before exiting
+    // ONE dial, ever: the drop must NOT schedule a background re-dial.
+    assert.strictEqual(FakeWebSocket.instances.length, 1,
+      "a drop must not re-dial in the background");
+    assert.strictEqual(lastState, "disabled");
+    assert.ok(lastDetail.includes("1006"),
+      `the chip must say why it ended, got: "${lastDetail}"`);
+
+    // ...and only a human connect() dials again:
+    client.connect("ws://hilltop:8710/ws");
+    assert.strictEqual(FakeWebSocket.instances.length, 2);
+    client.disconnect();
   });
 
 runIfMain();
