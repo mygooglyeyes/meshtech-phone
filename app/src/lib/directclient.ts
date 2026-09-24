@@ -7,11 +7,12 @@
  * transport, not a new decoder. Metadata is honest: snr is always null
  * (no radio hop - the UI shows "direct", never a fake number).
  *
- * Reconnect: exponential backoff 1s -> 30s with jitter (the answerbot's
- * proven pattern). On reconnect the client resumes from its last seq;
- * if the node's sequence regressed (node restarted), local state is
- * stale - a fresh LAYOUT is requested and callers are told via
- * onReset so stale maps are never kept without saying so.
+ * NO AUTO-RECONNECT (2026-09-23, Brett's call): a drop ENDS the
+ * session - the app shows disconnected and reconnecting is a human
+ * press of Connect (address + password stay saved). Why: background
+ * re-dials with a stale password tripped the node's anti-guessing
+ * lockout (5 refusals/min), locking out even the right password; and
+ * a broken link should say so, not hide behind silent retries.
  */
 
 import { decodeAny, type ScopePacket } from "./codec.ts";
@@ -31,16 +32,11 @@ export interface DirectClientEvents {
   onNodeState?: (snap: { listener: unknown; feed: unknown }) => void;
 }
 
-const MAX_BACKOFF_MS = 30_000;
-const BASE_BACKOFF_MS = 1_000;
-
 export class DirectClient {
   private ws: WebSocket | null = null;
   private state: DirectState = "disabled";
-  private backoffMs = BASE_BACKOFF_MS;
   private lastSeq = 0;
   private wantRun = false;
-  private timer: ReturnType<typeof setTimeout> | null = null;
   private proto = 0;
   private txEnabled = false;
   private benchNoRadio = false;
@@ -64,11 +60,6 @@ export class DirectClient {
   connect(url: string, token?: string): void {
     this.wantRun = true;
     this.token = token || null;
-    // THE RECONNECT DIALS THE ORIGINAL URL (2026-09-23, Brett's
-    // "retrying and not connecting"): remember it. lastUrl was never
-    // assigned - every reconnect after a drop dialed null, failed,
-    // and only a fresh page (a manual connect) ever recovered.
-    this.lastUrl = url;
     this.open(url);
   }
 
@@ -89,7 +80,8 @@ export class DirectClient {
       // Belt and braces: a blank address must never reach the
       // WebSocket constructor (it would silently connect somewhere
       // else or fail forever - never the node).
-      this.scheduleReconnect("no url to dial");
+      this.wantRun = false;
+      this.setState("disabled", "no address to dial");
       return;
     }
     this.setState("connecting");
@@ -103,13 +95,13 @@ export class DirectClient {
         ? new WebSocket(url, [`bearer.${this.token}`])
         : new WebSocket(url);
     } catch (err) {
-      this.scheduleReconnect(`bad url: ${String(err)}`);
+      this.wantRun = false;
+      this.setState("disabled", `bad address: ${String(err)}`);
       return;
     }
     this.ws = ws;
 
     ws.onopen = () => {
-      this.backoffMs = BASE_BACKOFF_MS; // healthy link: reset backoff
       // hello arrives as the first message; state reported there.
     };
     ws.onmessage = (ev) => this.onMessage(ev.data as string);
@@ -117,14 +109,19 @@ export class DirectClient {
       // CLOSE FORENSICS (2026-09-21, the quick-drop mystery): the
       // CloseEvent's code names who ended it - 1001 = the server said
       // "node restarting" (our own close_all_clients), 1006 = the
-      // TCP link died without a close frame (crash/network), and a
-      // heartbeat timeout shows as 1006 too. Without this line the
+      // TCP link died without a close frame (crash/network), 4401-ish
+      // paths land here as a refused upgrade. Without this line the
       // drop cause was unprovable.
       this.log(`link closed: code=${ev.code} clean=${ev.wasClean}`);
       this.ws = null;
-      if (this.wantRun) this.scheduleReconnect("link closed");
+      // NO AUTO-RECONNECT (Brett, 2026-09-23): end the session. The
+      // chip shows WHY (code 1006 = the network path died; a refused
+      // password lands here too), and Connect is a human press.
+      if (!this.wantRun) return;   // disconnect() already reported it
+      this.wantRun = false;
+      this.setState("disabled", `link closed (code ${ev.code})`);
     };
-    ws.onerror = () => { /* onclose follows; it owns the retry */ };
+    ws.onerror = () => { /* onclose follows; it owns the verdict */ };
   }
 
   private onMessage(raw: string): void {
@@ -198,24 +195,6 @@ export class DirectClient {
       return;
     }
   }
-
-  private scheduleReconnect(reason: string): void {
-    if (!this.wantRun) return;
-    this.setState("reconnecting", reason);
-    const jitter = Math.floor(Math.random() * 500);
-    this.timer = setTimeout(() => {
-      this.timer = null;
-      if (this.wantRun) {
-        // Node restarted (seq regressed) is detected at hello time via
-        // last_seq; treat every reconnect as potentially stale: if the
-        // node's hello last_seq < our lastSeq, state is stale.
-        this.open(this.lastUrl!);
-      }
-    }, this.backoffMs + jitter);
-    this.backoffMs = Math.min(this.backoffMs * 2, MAX_BACKOFF_MS);
-  }
-
-  private lastUrl: string | null = null;
 
   /** Refresh request over the wire - SAME codec bytes as radio mode.
    *  spanKm (v1.3): the client's wanted window (0 = host decides) -

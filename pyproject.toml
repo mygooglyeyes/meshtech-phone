@@ -1,6 +1,6 @@
 [project]
 name = "meshtech-phone"
-version = "00.000.010"
+version = "00.000.011"
 description = "Client apps for the MeshTech Scope system (web / android TWA / apple / tools branches; shared base on main)"
 requires-python = ">=3.12"
 
