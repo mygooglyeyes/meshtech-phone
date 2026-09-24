@@ -5,6 +5,11 @@
  * node-compat binary runs TS directly, so tests stay dependency-free
  * and still pin the golden vectors. Swap for vitest later if a
  * toolchain lands.
+ *
+ * Async tests (2026-09-23): a test fn may return a promise (or use
+ * async/await) - the runner awaits it before judging the result.
+ * Needed by the directclient reconnect test, whose retry timer fires
+ * ~1s after a simulated drop.
  */
 
 interface TestResult {
@@ -13,10 +18,10 @@ interface TestResult {
   error?: unknown;
 }
 
-const tests: Array<{ name: string; fn: () => void }> = [];
+const tests: Array<{ name: string; fn: () => void | Promise<void> }> = [];
 const results: TestResult[] = [];
 
-export function test(name: string, fn: () => void): void {
+export function test(name: string, fn: () => void | Promise<void>): void {
   tests.push({ name, fn });
 }
 
@@ -30,11 +35,11 @@ export function runIfMain(): void {
   setTimeout(execute, 0);
 }
 
-function execute(): void {
+async function execute(): Promise<void> {
   let failed = 0;
   for (const { name, fn } of tests) {
     try {
-      fn();
+      await fn();
       results.push({ name, ok: true });
       console.log(`ok   ${name}`);
     } catch (error) {
