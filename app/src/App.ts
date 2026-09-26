@@ -314,17 +314,19 @@ export function setMapSizeKm(km: number): void {
 // map frame is remembered so reopening the page draws THAT view at
 // once - the saved size's frame, never a stale odd one. Everything
 // read back is validated; anything odd means "no saved view".
-interface MapFrame { grid: number; centerLat: number; centerLon: number;
-  spanM: number; name: string; savedTs: number }
+interface MapFrame { grid: number; rows?: number; centerLat: number;
+  centerLon: number; spanM: number; name: string; savedTs: number }
 
-function saveMapFrame(l: { grid: number; centerLat: number;
+function saveMapFrame(l: { grid: number; rows?: number; centerLat: number;
   centerLon: number; spanM: number; name?: string }): void {
   if (l.grid !== 3 && l.grid !== 4 && l.grid !== 5) return;
+  const rows = l.rows ?? l.grid;
+  if (rows < 2 || rows > 5) return;
   if (!(l.spanM >= 1000) || !Number.isFinite(l.centerLat) ||
       !Number.isFinite(l.centerLon)) return;
   try {
     localStorage.setItem("scope.mapFrame", JSON.stringify({
-      grid: l.grid, centerLat: l.centerLat, centerLon: l.centerLon,
+      grid: l.grid, rows, centerLat: l.centerLat, centerLon: l.centerLon,
       spanM: l.spanM, name: l.name || "Area", savedTs: Date.now(),
     }));
   } catch { /* storage denied - the view just is not remembered */ }
@@ -335,10 +337,12 @@ function savedMapFrame(): MapFrame | null {
     const raw = localStorage.getItem("scope.mapFrame");
     if (!raw) return null;
     const f = JSON.parse(raw) as MapFrame;
+    const rows = f.rows ?? f.grid;
     if ((f.grid !== 3 && f.grid !== 4 && f.grid !== 5) ||
+        rows < 2 || rows > 5 ||
         !(f.spanM >= 1000) || !Number.isFinite(f.centerLat) ||
         !Number.isFinite(f.centerLon)) return null;
-    return f;
+    return { ...f, rows };
   } catch {
     return null;   // storage denied or corrupt JSON: no saved view
   }
@@ -351,7 +355,8 @@ function savedFallbackGeometry(): { geo: GridGeometry;
   counts: (number | null)[] } | null {
   const f = savedMapFrame();
   if (!f) return null;
-  const geo = new GridGeometry(f.grid, f.centerLat, f.centerLon, f.spanM);
+  const geo = new GridGeometry(f.grid, f.centerLat, f.centerLon, f.spanM,
+                               f.rows ?? f.grid);
   const counts: (number | null)[] = [];
   for (let i = 1; i <= geo.sectionCount; i++) {
     counts.push(state.health.sectionCounts?.[i - 1] ?? null);
@@ -473,7 +478,7 @@ function renderMap(): string {
     if (saved) {
       const nodes = state.dotNodes();   // one dot per name (map = counts)
       return `<div class="card"><h3>${esc(savedMapFrame()?.name || "Area")}
-        <span class="muted">(saved view: ${saved.geo.grid}x${saved.geo.grid},
+        <span class="muted">(saved view: ${saved.geo.grid}x${saved.geo.rows},
         ~${Math.round(saved.geo.spanM / 1000)} km across)</span>${refreshBtn}</h3>
         <div class="filters">
           <label class="filter">Map size
@@ -489,6 +494,7 @@ function renderMap(): string {
         ${dotLegend()}
         ${areaMapSvg({
           grid: saved.geo.grid,
+          rows: saved.geo.rows,
           west: saved.geo.west,
           south: saved.geo.south,
           spanDeg: saved.geo.spanDeg,
@@ -523,7 +529,7 @@ function renderMap(): string {
   // a fixed string. Node names reach the DOM only via esc() inside
   // areamap.ts <title> tooltips. Keep it that way.
   return `<div class="card"><h3>${esc(state.layout?.name || "Area")}
-    <span class="muted">(${state.geometry.grid}x${state.geometry.grid},
+    <span class="muted">(${state.geometry.grid}x${state.geometry.rows},
     ~${Math.round(state.geometry.spanM / 1000)} km across)</span>${refreshBtn}</h3>
     <div class="filters">
     <label class="filter">Map size
@@ -539,6 +545,7 @@ function renderMap(): string {
     ${dotLegend()}
     ${areaMapSvg({
       grid: state.geometry.grid,
+      rows: state.geometry.rows,
       west: state.geometry.west,
       south: state.geometry.south,
       spanDeg: state.geometry.spanDeg,

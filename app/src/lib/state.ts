@@ -124,7 +124,8 @@ export class ScopeState {
     if (!this.isPrimary(origin)) return "layout (peer)";
     if (this.primaryOrigin === null) this.primaryOrigin = origin;
     this.layout = l;
-    this.geometry = new GridGeometry(l.grid, l.centerLat, l.centerLon, l.spanM);
+    this.geometry = new GridGeometry(l.grid, l.centerLat, l.centerLon, l.spanM,
+                                     l.rows ?? l.grid);
     return "layout";
   }
 

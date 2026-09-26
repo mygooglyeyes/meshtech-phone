@@ -32,7 +32,10 @@ export interface MapNode {
 }
 
 export interface AreaMapOpts {
+  /** Columns across (the old "grid"). */
   grid: number;
+  /** Rows down (v1.6); absent = the square grid x grid. */
+  rows?: number;
   west: number;
   south: number;
   spanDeg: number;
@@ -134,8 +137,11 @@ export function dotLegend(): string {
 
 export function areaMapSvg(o: AreaMapOpts): string {
   const { grid, west, south, spanDeg: span } = o;
+  const rows = o.rows ?? grid;
   const north = south + span;
-  const cell = span / grid;
+  const cw = span / grid;   // cell width (columns across)
+  const ch = span / rows;   // cell height (rows down)
+  const cs = Math.min(cw, ch); // font/fit basis for cell text
   // Flush border (Brett 2026-09-18): the coverage square's outline
   // reaches the edge of the map display - just enough room that the
   // stroke itself isn't clipped.
@@ -154,20 +160,22 @@ export function areaMapSvg(o: AreaMapOpts): string {
     const a = (0.03 + 0.12 * (c / maxCount)).toFixed(3);
     const row = Math.floor(i / grid);
     const col = i % grid;
-    const x = west + col * cell;
-    const y = south + row * cell; // row 0 = NW = top
-    return `<rect class="heat" x="${x}" y="${y}" width="${cell}" height="${cell}" opacity="${a}"/>`;
+    const x = west + col * cw;
+    const y = south + row * ch; // row 0 = NW = top
+    return `<rect class="heat" x="${x}" y="${y}" width="${cw}" height="${ch}" opacity="${a}"/>`;
   };
 
   // Internal grid lines (thin).
   const lines: string[] = [];
   for (let i = 1; i < grid; i++) {
-    const p = west + i * cell;
-    const q = south + i * cell;
+    const p = west + i * cw;
     lines.push(
-      `<line class="gridline" x1="${p}" y1="${south}" x2="${p}" y2="${north}" stroke-width="${span * 0.0015}"/>`,
-      `<line class="gridline" x1="${west}" y1="${fy(q)}" x2="${west + span}" y2="${fy(q)}" stroke-width="${span * 0.0015}"/>`,
-    );
+      `<line class="gridline" x1="${p}" y1="${south}" x2="${p}" y2="${north}" stroke-width="${span * 0.0015}"/>`);
+  }
+  for (let i = 1; i < rows; i++) {
+    const q = south + i * ch;
+    lines.push(
+      `<line class="gridline" x1="${west}" y1="${fy(q)}" x2="${west + span}" y2="${fy(q)}" stroke-width="${span * 0.0015}"/>`);
   }
 
   // Ghost numerals: hard outline + faint fill (Brett's ghost look).
@@ -180,14 +188,14 @@ export function areaMapSvg(o: AreaMapOpts): string {
   // halved prominence 2026-09-18.
   const numerals: string[] = [];
   if (o.showSectionNumbers !== false) {
-    for (let i = 1; i <= grid * grid; i++) {
+    for (let i = 1; i <= grid * rows; i++) {
       const row = Math.floor((i - 1) / grid);
       const col = (i - 1) % grid;
-      const cx = west + col * cell + cell / 2;
-      const cy = south + row * cell + cell / 2;
+      const cx = west + col * cw + cw / 2;
+      const cy = south + row * ch + ch / 2;
       numerals.push(
-        `<text class="ghost" x="${cx}" y="${cy}" font-size="${cell * 0.31}" ` +
-        `stroke-width="${cell * 0.006}" text-anchor="middle" dominant-baseline="central">${i}</text>`);
+        `<text class="ghost" x="${cx}" y="${cy}" font-size="${cs * 0.31}" ` +
+        `stroke-width="${cs * 0.006}" text-anchor="middle" dominant-baseline="central">${i}</text>`);
     }
   }
 
@@ -206,20 +214,20 @@ export function areaMapSvg(o: AreaMapOpts): string {
   const counts = o.counts.map((c, i) => {
     const row = Math.floor(i / grid);
     const col = i % grid;
-    const x = west + col * cell + cell * 0.08;
-    const y = south + row * cell + cell * 0.16;
-    return `<text class="cellcount" x="${x}" y="${y}" font-size="${cell * 0.11}" ` +
-      `stroke-width="${cell * 0.03}">${c == null ? "?" : c}</text>`;
+    const x = west + col * cw + cw * 0.08;
+    const y = south + row * ch + ch * 0.16;
+    return `<text class="cellcount" x="${x}" y="${y}" font-size="${cs * 0.11}" ` +
+      `stroke-width="${cs * 0.03}">${c == null ? "?" : c}</text>`;
   }).join("");
 
   // Clickable cells LAST so taps land on the section, not the dots.
   const cells: string[] = [];
-  for (let i = 1; i <= grid * grid; i++) {
+  for (let i = 1; i <= grid * rows; i++) {
     const row = Math.floor((i - 1) / grid);
     const col = (i - 1) % grid;
-    const x = west + col * cell;
-    const y = south + row * cell;
-    cells.push(`<rect class="cell" data-section="${i}" x="${x}" y="${y}" width="${cell}" height="${cell}"/>`);
+    const x = west + col * cw;
+    const y = south + row * ch;
+    cells.push(`<rect class="cell" data-section="${i}" x="${x}" y="${y}" width="${cw}" height="${ch}"/>`);
   }
 
   // Land/water backdrop (baked Natural Earth land, public domain):

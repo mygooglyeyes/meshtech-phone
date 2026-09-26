@@ -70,10 +70,11 @@ function u16(value: number, what: string): number {
   return value;
 }
 
-function packHeader(seq: number, origin = 0): Uint8Array {
+function packHeader(seq: number, origin = 0,
+                    version: number = PROTO_VERSION): Uint8Array {
   // v1.1: version(1) + seq(2 LE) + origin(2 LE)
   const b = new Uint8Array(5);
-  b[0] = PROTO_VERSION;
+  b[0] = version;
   b[1] = u16(seq, "seq") & 0xff;
   b[2] = (u16(seq, "seq") >> 8) & 0xff;
   b[3] = u16(origin, "origin") & 0xff;
@@ -98,7 +99,7 @@ function unpackHeader(p: Uint8Array, off: number): [Header, number] {
   // STRICT like the Python codec: an unknown version must not be read
   // with guessed field widths - a loud error beats a confident misread.
   if (version !== 0x02 && version !== 0x03 && version !== 0x04 &&
-      version !== 0x05)
+      version !== 0x05 && version !== 0x06)
     throw new CodecError(`unsupported protocol version 0x${version.toString(16).padStart(2, "0")}`);
   if (p.length < off + 5) throw new CodecError("payload too short for v1.1 header");
   return [{ version, seq: p[off + 1] | (p[off + 2] << 8),
@@ -329,15 +330,17 @@ function positionFromDeltas(intro: { centerLat: number; centerLon: number; spanM
 
 export function encodeIntro(intro: Omit<Intro, "kind">): Uint8Array {
   if (intro.entries.length > 255) throw new CodecError("too many intro entries");
-  // v1.5: the span rides the packet (Brett's offset-dots fix) - the
-  // decoder never has to GUESS the scale the deltas were measured at.
+  // v1.6: the ruler rides the packet (Brett's offset-dots fix, kept
+  // honest): 3 LE meters - big enough for every node heard, so no dot
+  // is ever clamped at a window edge and none is thrown away.
   const spanWire = Math.round(intro.spanM);
-  if (!Number.isInteger(spanWire) || spanWire <= 0 || spanWire > 0xffff)
+  if (!Number.isInteger(spanWire) || spanWire <= 0 || spanWire > 0xffffff)
     throw new CodecError(`intro span_m out of wire range: ${intro.spanM}`);
-  const spanBytes = new Uint8Array(2);
+  const spanBytes = new Uint8Array(3);
   spanBytes[0] = spanWire & 0xff;
   spanBytes[1] = (spanWire >> 8) & 0xff;
-  const chunks: Uint8Array[] = [packHeader(intro.seq, intro.origin ?? 0),
+  spanBytes[2] = (spanWire >> 16) & 0xff;
+  const chunks: Uint8Array[] = [packHeader(intro.seq, intro.origin ?? 0, 0x06),
                                 spanBytes,
                                 Uint8Array.of(intro.entries.length)];
   for (const entry of intro.entries) {
@@ -375,23 +378,25 @@ export function decodeIntro(
   const centerLon = opts.centerLon ?? 0.0;
   const [h, off0] = unpackHeader(body, 0);
   let off = off0;
-  // v1.5: the packet carries its OWN span (2 LE meters) - the truth
-  // the deltas were measured at. The opts spanM (a caller's LAYOUT
-  // guess) is cross-check only: a mismatch throws, loudly, instead of
-  // scaling every dot wrong in silence (Brett's offset-dots bug).
-  // No opts = TRUST the packet. v1.0-1.4 packets carry no span field:
-  // fall back to the caller's span (or the era's 40 km assumption)
-  // for packets still in flight from a pre-v1.5 host.
+  // v1.6: the packet carries its OWN ruler (3 LE meters) - the truth
+  // the deltas were measured at. THE PACKET'S RULER IS THE TRUTH: a
+  // caller's LAYOUT span no longer argues with it (the old mismatch
+  // throw is gone - it threw away whole INTROs over a stale guess).
+  // v1.5: 2 LE meters. v1.0-1.4: no span on the wire - fall back to
+  // the caller's span (or the era's 40 km assumption) for old hosts.
   let spanM: number;
   let wireSpan: number | undefined;
-  if (h.version >= 0x05) {
+  if (h.version >= 0x06) {
+    if (body.length < off + 3) throw new CodecError("INTRO too short for span field");
+    wireSpan = body[off] | (body[off + 1] << 8) | (body[off + 2] << 16);
+    off += 3;
+    if (wireSpan <= 0) throw new CodecError(`INTRO span must be positive, got ${wireSpan}`);
+    spanM = wireSpan;
+  } else if (h.version >= 0x05) {
     if (body.length < off + 2) throw new CodecError("INTRO too short for span field");
     wireSpan = body[off] | (body[off + 1] << 8);
     off += 2;
     if (wireSpan <= 0) throw new CodecError(`INTRO span must be positive, got ${wireSpan}`);
-    if (opts.spanM != null && Math.round(opts.spanM) !== wireSpan)
-      throw new CodecError(
-        `INTRO span mismatch: packet says ${wireSpan} m, caller assumed ${Math.round(opts.spanM)} m`);
     spanM = wireSpan;
   } else {
     spanM = opts.spanM ?? 40000.0;
@@ -436,6 +441,9 @@ export interface Layout {
   seq: number;
   origin?: number;
   grid: number;
+  /** v1.6: rows DOWN (grid = columns across). Absent on old wires =
+   *  the square grid x grid. */
+  rows?: number;
   centerLat: number;
   centerLon: number;
   spanM: number;
@@ -444,8 +452,10 @@ export interface Layout {
 
 export function encodeLayout(l: Omit<Layout, "kind">): Uint8Array {
   if (l.grid < 2 || l.grid > 5) throw new CodecError(`grid out of range: ${l.grid}`);
+  const rows = (l.rows ?? l.grid) > 0 ? (l.rows ?? l.grid) : l.grid;
+  if (rows < 2 || rows > 5) throw new CodecError(`rows out of range: ${rows}`);
   const nameBytes = new TextEncoder().encode(l.name.slice(0, MAX_NAME));
-  const body = new Uint8Array(5 + 1 + 8 + 2 + 1 + nameBytes.length);
+  const body = new Uint8Array(5 + 1 + 8 + 2 + 1 + nameBytes.length + 1);
   body.set(packHeader(l.seq, l.origin ?? 0), 0);
   const dv = new DataView(body.buffer);
   let o = 5;
@@ -455,6 +465,7 @@ export function encodeLayout(l: Omit<Layout, "kind">): Uint8Array {
   dv.setUint16(o, u16(l.spanM, "span_m"), true); o += 2;
   body[o] = nameBytes.length; o += 1;
   body.set(nameBytes, o);
+  body[body.length - 1] = rows; // v1.6: AFTER the name (old decoders skip it)
   return dataBytes(TYPE_LAYOUT, body);
 }
 
@@ -470,7 +481,14 @@ export function decodeLayout(body: Uint8Array): Layout {
   const nameLen = body[off]; off += 1;
   if (body.length < off + nameLen) throw new CodecError("LAYOUT name truncated");
   const name = new TextDecoder().decode(body.subarray(off, off + nameLen));
-  return { kind: "layout", seq: h.seq, origin: h.origin, grid,
+  off += nameLen;
+  // v1.6 trailing rows byte; absent = the legacy square (grid x grid).
+  let rows = grid;
+  if (body.length > off) {
+    rows = body[off];
+    if (rows < 2 || rows > 5) throw new CodecError(`LAYOUT rows out of range: ${rows}`);
+  }
+  return { kind: "layout", seq: h.seq, origin: h.origin, grid, rows,
            centerLat, centerLon, spanM, name };
 }
 

@@ -39,12 +39,12 @@ function routeLabel(rid: number): string {
 // Area: 94945 / Novato CA (Brett's home grid), matching the host
 // demo's config default. Everything stays synthetic - honest demo.
 // ---- Host A (origin 0xb17e, "hilltop") - the primary demo host ----
-state.apply({ kind: "layout", seq: 1, origin: 0xb17e, grid: 3,
+state.apply({ kind: "layout", seq: 1, origin: 0xb17e, grid: 3, rows: 4,
   centerLat: 38.1074, centerLon: -122.5697, spanM: 40000,
   name: "Novato / 94945 (synthetic)" });
 state.apply({ kind: "pulse", seq: 2, origin: 0xb17e, uptimeMin: 90,
   rxPerHour: 214, feedAirtimeSPerH: 3, activeTotal: 31,
-  sectionCounts: [4, 2, 6, 1, 9, 3, 2, 1, 3] });
+  sectionCounts: [4, 2, 6, 1, 9, 3, 2, 1, 3, 0, 1, 2] });
 state.apply({ kind: "sect_sum", seq: 3, origin: 0xb17e, sectionId: 5,
   activeNodes: 9, packetCount: 126, delayP50S: 48, delayP90S: 816,
   routeStubs: [0x0221, 0xabcd] });
@@ -68,12 +68,12 @@ state.apply({ kind: "intro", seq: 5, origin: 0xb17e, entries: [
 
 // ---- Host B (origin 0x0a11, overlapping to the west) - proves the
 // multi-host client path: separate layout, health and sections ----
-state.apply({ kind: "layout", seq: 6, origin: 0x0a11, grid: 3,
+state.apply({ kind: "layout", seq: 6, origin: 0x0a11, grid: 3, rows: 4,
   centerLat: 38.1074, centerLon: -122.6697, spanM: 40000,
   name: "West ridge (synthetic)" });
 state.apply({ kind: "pulse", seq: 7, origin: 0x0a11, uptimeMin: 45,
   rxPerHour: 96, feedAirtimeSPerH: 2, activeTotal: 12,
-  sectionCounts: [1, 0, 0, 3, 5, 1, 0, 2, 0] });
+  sectionCounts: [1, 0, 0, 3, 5, 1, 0, 2, 0, 0, 0, 1] });
 state.apply({ kind: "sect_sum", seq: 8, origin: 0x0a11, sectionId: 5,
   activeNodes: 5, packetCount: 38, delayP50S: 61, delayP90S: 900,
   routeStubs: [] });
@@ -221,6 +221,7 @@ function render(): void {
           ${showSectionNumbers ? "checked" : ""}/> Section numbers</label>
         ${areaMapSvg({
           grid: state.geometry!.grid,
+          rows: state.geometry!.rows,
           west: state.geometry!.west,
           south: state.geometry!.south,
           spanDeg: state.geometry!.spanDeg,

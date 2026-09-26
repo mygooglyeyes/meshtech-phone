@@ -34,3 +34,5 @@ test("S1: hostile names are escaped, not executable", () => {
   const quote = routeDisplayName(['\" onmouseover=\"x']);
   assert.ok(!quote.includes('" onmouseover'), "attribute break-out escaped");
 });
+
+runIfMain();

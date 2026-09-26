@@ -21,13 +21,20 @@ export interface SectionRect {
 }
 
 export class GridGeometry {
+  /** Columns ACROSS (the old "grid"). */
   readonly grid: number;
+  /** Rows DOWN (v1.6: LAYOUT's trailing byte; absent = the old
+   *  square grid x grid). 3x4 = 12 sections, 1 upper-left through
+   *  12 lower-right, row-major from the NW corner. */
+  readonly rows: number;
   readonly centerLat: number;
   readonly centerLon: number;
   readonly spanM: number;
 
-  constructor(grid: number, centerLat: number, centerLon: number, spanM: number) {
+  constructor(grid: number, centerLat: number, centerLon: number, spanM: number,
+              rows: number = grid) {
     this.grid = grid;
+    this.rows = rows;
     this.centerLat = centerLat;
     this.centerLon = centerLon;
     this.spanM = spanM;
@@ -41,7 +48,7 @@ export class GridGeometry {
   get east(): number { return this.centerLon + this.spanDeg / 2; }
   get north(): number { return this.centerLat + this.spanDeg / 2; }
   get south(): number { return this.centerLat - this.spanDeg / 2; }
-  get sectionCount(): number { return this.grid * this.grid; }
+  get sectionCount(): number { return this.grid * this.rows; }
 
   section(sectionId: number): SectionRect {
     if (sectionId < 1 || sectionId > this.sectionCount)
@@ -49,8 +56,9 @@ export class GridGeometry {
     const row = Math.floor((sectionId - 1) / this.grid);
     const col = (sectionId - 1) % this.grid;
     const width = this.spanDeg / this.grid;
-    const north = this.north - row * width;
-    const south = north - width;
+    const height = this.spanDeg / this.rows;
+    const north = this.north - row * height;
+    const south = north - height;
     const west = this.west + col * width;
     return { sectionId, col, row, west, east: west + width, south, north };
   }
@@ -59,8 +67,9 @@ export class GridGeometry {
     if (lat < this.south || lat > this.north || lon < this.west || lon > this.east)
       return -1;
     const width = this.spanDeg / this.grid;
+    const height = this.spanDeg / this.rows;
     const col = Math.min(this.grid - 1, Math.floor((lon - this.west) / width));
-    const row = Math.min(this.grid - 1, Math.floor((this.north - lat) / width));
+    const row = Math.min(this.rows - 1, Math.floor((this.north - lat) / height));
     return row * this.grid + col + 1;
   }
 }

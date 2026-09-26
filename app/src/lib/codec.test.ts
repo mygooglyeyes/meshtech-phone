@@ -16,15 +16,18 @@ import {
 
 // Golden vectors - DO NOT hand-edit; regenerate with gen_golden.py
 // (meshtech-node repo) and copy the values here.
-// v1.5 (PROTO_VERSION 0x05, 2026-09-23): version byte 05; the INTRO
-// vector is 2 bytes longer - the packet now carries its OWN span
-// (409c = 40000 m LE), so the client never guesses the delta scale.
+// v1.6 (2026-09-26): INTRO rides version 06 with the ruler as 3 LE
+// meters (409c00 = 40000 m) - big enough for every node heard, so a
+// dot is never clamped at a window edge (hard rule 2). LAYOUT gains
+// a trailing rows byte (03 = 3x4) after the name - old decoders skip
+// it. Refresh/pulse/sect_sum/route vectors unchanged (the client
+// still SENDS its v1.5 refresh; the host accepts v2-6).
 const GOLDEN: Record<string, string> = {
   "pulse": "0153170513017eb1d20404000900280009090305080200010406",
   "sect_sum": "0253130504007eb101017e003000300300022102cdab",
   "route": "0353120502007eb101efbe38000400110003112233",
-  "layout": "0553150503007eb10344d61200a01ce9ff409c0464656d6f",
-  "intro": "04531e0502007eb1409c0211030748696c6c746f7024002400220105416c696365",
+  "layout": "0553160503007eb10344d61200a01ce9ff409c0464656d6f03",
+  "intro": "04531f0602007eb1409c000211030748696c6c746f7024002400220105416c696365",
   "refresh": "11530e050200420002efbe7eb134120000",
 };
 
@@ -107,24 +110,35 @@ test("intro roundtrip with positions", () => {
 
 // THE OFFSET-DOTS REGRESSION (2026-09-23, Brett: "a new set of offset
 // node dots on every connect"): the INTRO must carry its OWN span.
-// Before v1.5 the client guessed the scale from the held LAYOUT - any
-// mismatch (sized window, replayed LAYOUT) scaled every dot wrong.
-test("intro carries its own span - the packet wins over any caller guess", () => {
+// The packet's ruler is the truth (v1.6, Brett's position law): the
+// decoder never GUESSES the scale and a caller's LAYOUT span no
+// longer argues with the packet - the old mismatch throw is gone.
+test("the packet's ruler is the truth - a caller span no longer argues with it", () => {
   const raw = encodeIntro({ seq: 1, centerLat: 0, centerLon: 0,
     spanM: 60000.0,
     entries: [{ prefix: 0x11, name: "Sixty", lat: 0.2, lon: -0.2 }] });
-  // decode with NO opts: the packet's span is used, positions true
+  // decode with NO opts: the packet's ruler is used, positions true
   const truth = decodeIntro(raw.subarray(3));
   assert.strictEqual(truth.spanM, 60000);
   assert.strictEqual(truth.wireSpanM, 60000);
   assert.ok(Math.abs(truth.entries[0].lat! - 0.2) < 0.002);
-  // a caller holding the WRONG LAYOUT (40 km) gets a loud error -
-  // never a silently scaled set of offset dots
-  assert.throws(
-    () => decodeIntro(raw.subarray(3), { spanM: 40000.0 }), CodecError);
-  // the matching span still decodes (cross-check passes)
-  const agree = decodeIntro(raw.subarray(3), { spanM: 60000.0 });
-  assert.ok(Math.abs(agree.entries[0].lat! - 0.2) < 0.002);
+  // a caller holding a STALE LAYOUT span (40 km) no longer argues:
+  // the packet's ruler still sets the scale, dots stay true
+  const stale = decodeIntro(raw.subarray(3), { spanM: 40000.0 });
+  assert.strictEqual(stale.spanM, 60000);
+  assert.ok(Math.abs(stale.entries[0].lat! - 0.2) < 0.002);
+});
+
+// A far node travels TRUE - never pinned at a window edge (hard
+// rule 2: never fabricate data). The ruler reaches every node the
+// host has ever heard, so the deltas always land where the node is.
+test("a far node travels TRUE - never pinned at a window edge", () => {
+  const raw = encodeIntro({ seq: 3, centerLat: 38.0, centerLon: -122.5,
+    spanM: 200000.0,
+    entries: [{ prefix: 0x33, name: "Far", lat: 38.9, lon: -122.5 }] });
+  const got = decodeIntro(raw.subarray(3),
+    { centerLat: 38.0, centerLon: -122.5 });
+  assert.ok(Math.abs(got.entries[0].lat! - 38.9) < 0.01);
 });
 
 // THE ZERO-DOTS REGRESSION (2026-09-22): the LIVE path decodes INTRO
@@ -222,7 +236,7 @@ test("intro class bits leave golden-vector bytes untouched", () => {
       { prefix: 0x22, name: "Alice" },
     ] });
   assert.strictEqual(hex(raw),
-    "04531e0502007eb1409c0211030748696c6c746f7024002400220105416c696365");
+    "04531f0602007eb1409c000211030748696c6c746f7024002400220105416c696365");
 });
 
 test("esc neutralises wire-string injection", () => {
